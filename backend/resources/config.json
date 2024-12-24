@@ -1,0 +1,14 @@
+{
+    "jwt": {
+        "secretKey": "",
+        "exp": "",
+        "issuer": "",
+        "audience": ""
+    },
+    "docker": {
+
+    },
+    "logging": {
+        "log_level": "INFO"
+    }
+}
