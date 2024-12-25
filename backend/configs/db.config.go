@@ -2,7 +2,6 @@ package configs
 
 import (
 	"fmt"
-	"os"
 )
 
 type DBConfig struct {
@@ -23,11 +22,11 @@ func (config *DBConfig) DSN() string {
 
 func InitDBConfig() DBConfig {
 	return DBConfig{
-		Name:     os.Getenv("db_name"),
-		User:     os.Getenv("db_user"),
-		Password: os.Getenv("db_password"),
-		Host:     os.Getenv("db_host"),
-		SSLMode:  os.Getenv("db_ssl_mode"),
-		Port:     os.Getenv("db_port"),
+		Name:     GetEnvVar("DB_NAME"),
+		User:     GetEnvVar("DB_USER"),
+		Password: GetEnvVar("DB_PASSWORD"),
+		Host:     GetEnvVar("DB_HOST"),
+		SSLMode:  GetEnvVar("DB_SSL_MODE"),
+		Port:     GetEnvVar("DB_PORT"),
 	}
 }

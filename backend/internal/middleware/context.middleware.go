@@ -12,11 +12,13 @@ type AppContext struct {
 	PersistenceManager *db.PersistenceManager
 	Jwt                utils.JwtUtils
 	LocaleConfig       *configs.LocaleConfig
+	Logger             *utils.Logger
 }
 
 const JwtContextKey = "JwtContextKey"
 const PersistenceContextKey = "PersistenceContextKey"
 const LocaleContextKey = "LocaleContextKey"
+const LoggerContextKey = "LoggerContextKey"
 
 func ContextMiddleware(ctx AppContext) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -24,6 +26,7 @@ func ContextMiddleware(ctx AppContext) func(http.Handler) http.Handler {
 			newCtx := context.WithValue(r.Context(), JwtContextKey, ctx.Jwt)
 			newCtx = context.WithValue(newCtx, PersistenceContextKey, ctx.PersistenceManager)
 			newCtx = context.WithValue(newCtx, LocaleContextKey, ctx.LocaleConfig)
+			newCtx = context.WithValue(newCtx, LoggerContextKey, ctx.Logger)
 			next.ServeHTTP(w, r.WithContext(newCtx))
 		}
 		return http.HandlerFunc(handler)

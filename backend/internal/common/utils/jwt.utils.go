@@ -29,7 +29,7 @@ func (config *JwtUtils) Create(subject string) string {
 		"iss": config.Issuer,
 		"aud": config.Audience,
 	})
-	tkStr, err := token.SignedString(config.SecretKey)
+	tkStr, err := token.SignedString([]byte(config.SecretKey))
 	if err != nil {
 		panic(errors.InternalServerError(ErrorSigningFailure, err))
 	}

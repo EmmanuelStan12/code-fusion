@@ -1,14 +1,14 @@
 {
     "jwt": {
-        "secretKey": "",
-        "exp": "",
-        "issuer": "",
-        "audience": ""
+        "secretKey": "RandomKey",
+        "expInHours": 24,
+        "issuer": "CodeFusion",
+        "audience": "CodeFusion"
     },
     "docker": {
 
     },
     "logging": {
-        "log_level": "INFO"
+        "logLevel": 0
     }
 }

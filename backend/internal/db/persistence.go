@@ -7,20 +7,19 @@ import (
 	"time"
 )
 
-const (
-	ErrorCannotInitConnection = "DB_CANNOT_INIT_DATABASE"
-)
-
 type PersistenceManager struct {
-	config configs.DBConfig
-	DB     *gorm.DB
+	config   configs.DBConfig
+	DB       *gorm.DB
+	entities []interface{}
 }
 
 func Init(config configs.DBConfig) *PersistenceManager {
 	db, err := gorm.Open(postgres.New(postgres.Config{
 		DSN:                  config.DSN(),
 		PreferSimpleProtocol: true,
-	}), &gorm.Config{})
+	}), &gorm.Config{
+		DisableForeignKeyConstraintWhenMigrating: true,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -33,13 +32,13 @@ func Init(config configs.DBConfig) *PersistenceManager {
 
 	sqlDB.SetConnMaxLifetime(time.Hour)
 	return &PersistenceManager{
-		db:     db,
+		DB:     db,
 		config: config,
 	}
 }
 
 func (manager *PersistenceManager) IsConnected() bool {
-	sqlDB, err := manager.db.DB()
+	sqlDB, err := manager.DB.DB()
 	if err != nil {
 		return false
 	}
@@ -50,4 +49,15 @@ func (manager *PersistenceManager) IsConnected() bool {
 	}
 
 	return true
+}
+
+func (manager *PersistenceManager) RegisterEntity(entities ...interface{}) {
+	manager.entities = append(manager.entities, entities...)
+}
+
+func (manager *PersistenceManager) Migrate() {
+	err := manager.DB.AutoMigrate(manager.entities...)
+	if err != nil {
+		panic(err)
+	}
 }

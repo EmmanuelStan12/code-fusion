@@ -1,8 +1,8 @@
 package configs
 
 type JwtConfig struct {
-	SecretKey []byte
-	Exp       int
-	Issuer    string
-	Audience  string
+	SecretKey  string `json:"secretKey"`
+	ExpInHours int    `json:"expInHours"`
+	Issuer     string `json:"issuer"`
+	Audience   string `json:"audience"`
 }

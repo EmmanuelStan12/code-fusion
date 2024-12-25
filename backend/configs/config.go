@@ -6,9 +6,9 @@ import (
 )
 
 type AppConfig struct {
-	DB     DBConfig
-	JWT    JwtConfig    `json:"jwt"`
-	Logger LoggerConfig `json:"logging"`
+	DB       DBConfig
+	JWT      JwtConfig `json:"jwt"`
+	LogLevel int       `json:"logLevel"`
 }
 
 func LoadConfig(configPath string) (*AppConfig, error) {

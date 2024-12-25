@@ -18,6 +18,7 @@ var (
 	ErrEmptyField             = "EMPTY_FIELD"
 	ErrInvalidPassword        = "INVALID_PASSWORD"
 	ErrInvalidEmailOrPassword = "INVALID_EMAIL_OR_PASSWORD"
+	ErrEmailAlreadyExists     = "EMAIL_ALREADY_EXISTS"
 )
 
 func validateEmail(email string) bool {
@@ -30,10 +31,6 @@ func validateEmail(email string) bool {
 
 func validatePassword(password string) bool {
 	if len(password) < 8 {
-		return false
-	}
-	re := regexp.MustCompile(`^(?=.*[a-zA-Z])(?=.*\d)`)
-	if !re.MatchString(password) {
 		return false
 	}
 	return true
@@ -82,6 +79,11 @@ func (s *AuthService) Register(data *dto.RegisterDTO) dto.AuthDTO {
 	if !validateEmail(data.Email) {
 		panic(appErrors.BadRequest(ErrInvalidEmail, nil))
 	}
+	user := model.UserModel{Email: data.Email}
+	result := s.Manager.DB.First(&user)
+	if result.Error == nil {
+		panic(appErrors.BadRequest(ErrEmailAlreadyExists, nil))
+	}
 	if !validatePassword(data.Password) {
 		panic(appErrors.BadRequest(ErrInvalidPassword, nil))
 	}
@@ -92,13 +94,13 @@ func (s *AuthService) Register(data *dto.RegisterDTO) dto.AuthDTO {
 		panic(appErrors.ValidationError(ErrEmptyField, "firstName"))
 	}
 	hashedPassword := hashPassword(data.Password)
-	user := model.UserModel{
+	user = model.UserModel{
 		Firstname: data.FirstName,
 		Lastname:  data.LastName,
 		Email:     data.Email,
 		Password:  hashedPassword,
 	}
-	result := s.Manager.DB.Create(&user)
+	result = s.Manager.DB.Create(&user)
 	if result.Error != nil {
 		panic(result.Error)
 	}

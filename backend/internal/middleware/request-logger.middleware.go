@@ -1,10 +1,8 @@
 package middleware
 
 import (
-	"github.com/EmmanuelStan12/code-fusion/configs"
-	"log"
+	"github.com/EmmanuelStan12/code-fusion/internal/common/utils"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -25,7 +23,7 @@ func (rw *ResponseWriterWrapper) Write(data []byte) (int, error) {
 	return bytes, err
 }
 
-func RequestLoggerMiddleware(config configs.LoggerConfig) func(http.Handler) http.Handler {
+func RequestLoggerMiddleware(log *utils.Logger) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			startTime := time.Now()
@@ -33,27 +31,19 @@ func RequestLoggerMiddleware(config configs.LoggerConfig) func(http.Handler) htt
 				ResponseWriter: w,
 				StatusCode:     0,
 			}
-			handler.ServeHTTP(writer, r)
 			defer func() {
-				WriteLog(config, time.Now(), writer.StatusCode, time.Since(startTime), r)
+				WriteLog(log, writer.StatusCode, time.Since(startTime), r)
 			}()
+			handler.ServeHTTP(writer, r)
 		}
 		return http.HandlerFunc(fn)
 	}
 }
 
-func WriteLog(config configs.LoggerConfig, currentTime time.Time, status int, elapsed time.Duration, r *http.Request) {
-	if config.Level == configs.LogLevelInfo || config.Level == configs.LogLevelDebug || config.Level == configs.LogLevelError {
-		log.Printf("[%s] %s %s %d %d", currentTime.Format(time.RFC3339), r.Method, r.URL.Path, status, elapsed)
-	}
+func WriteLog(log *utils.Logger, status int, elapsed time.Duration, r *http.Request) {
+	log.Info(" %s %s %d %d milliseconds", r.Method, r.URL.Path, status, elapsed)
 
-	if config.Level == configs.LogLevelDebug {
-		for name, values := range r.Header {
-			log.Printf("Header: %s=%s", name, strings.Join(values, ","))
-		}
-	}
-
-	if config.Level == configs.LogLevelError && status >= 400 {
-		log.Printf("[%s] ERROR: %s %s returned %d in %v", currentTime.Format(time.RFC3339), r.Method, r.URL.Path, status, elapsed)
+	if status >= 400 {
+		log.Error("%s %s returned %d in %v", r.Method, r.URL.Path, status, elapsed)
 	}
 }
