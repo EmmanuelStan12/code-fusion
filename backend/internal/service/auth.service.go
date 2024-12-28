@@ -9,24 +9,26 @@ import (
 	"github.com/EmmanuelStan12/code-fusion/internal/model"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
-	"regexp"
+	"log"
+	"net/mail"
 	"strconv"
 )
 
 var (
 	ErrInvalidEmail           = "INVALID_EMAIL"
-	ErrEmptyField             = "EMPTY_FIELD"
+	ErrInvalidLastname        = "INVALID_LASTNAME"
+	ErrInvalidFirstname       = "INVALID_FIRSTNAME"
+	ErrInvalidUsername        = "INVALID_USERNAME"
 	ErrInvalidPassword        = "INVALID_PASSWORD"
 	ErrInvalidEmailOrPassword = "INVALID_EMAIL_OR_PASSWORD"
 	ErrEmailAlreadyExists     = "EMAIL_ALREADY_EXISTS"
+	ErrUsernameAlreadyExists  = "USERNAME_ALREADY_EXISTS"
 )
 
 func validateEmail(email string) bool {
-	re := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-	if !re.MatchString(email) {
-		return false
-	}
-	return true
+	_, err := mail.ParseAddress(email)
+	log.Printf("ERROR: %v\n", err)
+	return err == nil
 }
 
 func validatePassword(password string) bool {
@@ -37,8 +39,14 @@ func validatePassword(password string) bool {
 }
 
 type AuthService struct {
-	Manager *db.PersistenceManager
-	Jwt     utils.JwtUtils
+	BaseService
+}
+
+func NewAuthService(jwt utils.JwtUtils, manager *db.PersistenceManager) *AuthService {
+	authService := AuthService{}
+	authService.Jwt = jwt
+	authService.Manager = manager
+	return &authService
 }
 
 func hashPassword(password string) string {
@@ -79,19 +87,26 @@ func (s *AuthService) Register(data *dto.RegisterDTO) dto.AuthDTO {
 	if !validateEmail(data.Email) {
 		panic(appErrors.BadRequest(ErrInvalidEmail, nil))
 	}
-	user := model.UserModel{Email: data.Email}
-	result := s.Manager.DB.First(&user)
-	if result.Error == nil {
+	user := model.UserModel{}
+	result := s.Manager.DB.Find(&user, "email = ?", data.Email)
+	if user.Email != "" {
 		panic(appErrors.BadRequest(ErrEmailAlreadyExists, nil))
 	}
 	if !validatePassword(data.Password) {
 		panic(appErrors.BadRequest(ErrInvalidPassword, nil))
 	}
 	if len(data.LastName) == 0 {
-		panic(appErrors.ValidationError(ErrEmptyField, "lastName"))
+		panic(appErrors.BadRequest(ErrInvalidLastname, nil))
 	}
 	if len(data.FirstName) == 0 {
-		panic(appErrors.ValidationError(ErrEmptyField, "firstName"))
+		panic(appErrors.BadRequest(ErrInvalidFirstname, nil))
+	}
+	if len(data.Username) == 0 {
+		panic(appErrors.BadRequest(ErrInvalidUsername, nil))
+	}
+	result = s.Manager.DB.Find(&user, "username = ?", data.Username)
+	if user.Username != "" {
+		panic(appErrors.BadRequest(ErrUsernameAlreadyExists, nil))
 	}
 	hashedPassword := hashPassword(data.Password)
 	user = model.UserModel{
@@ -99,6 +114,7 @@ func (s *AuthService) Register(data *dto.RegisterDTO) dto.AuthDTO {
 		Lastname:  data.LastName,
 		Email:     data.Email,
 		Password:  hashedPassword,
+		Username:  data.Username,
 	}
 	result = s.Manager.DB.Create(&user)
 	if result.Error != nil {

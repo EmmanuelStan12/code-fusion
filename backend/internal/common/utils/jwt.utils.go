@@ -38,7 +38,7 @@ func (config *JwtUtils) Create(subject string) string {
 
 func (config *JwtUtils) Verify(tkStr string) string {
 	token, err := jwt.Parse(tkStr, func(token *jwt.Token) (interface{}, error) {
-		return config.SecretKey, nil
+		return []byte(config.SecretKey), nil
 	})
 	if err != nil {
 		panic(errors.Unauthorized(ErrorTokenExpired, err))

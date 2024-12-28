@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option go_package = "github.com/EmmanuelStan12/code-fusion/backend/internal/proto";
+
+message ExecuteCodeRequest {
+  string code = 1;
+  string sessionId = 2;
+}
+
+message ExecuteCodeResponse {
+  string sessionId = 1;
+  string result = 2;
+  bool success = 3;
+  string stdout = 4;
+  string error = 5;
+}
+
+service CodeExecutionService {
+  rpc ExecuteCode(stream ExecuteCodeRequest) returns (stream ExecuteCodeResponse) {}
+}

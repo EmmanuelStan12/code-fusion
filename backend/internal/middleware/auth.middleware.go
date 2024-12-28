@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 var excludedPaths = []string{
@@ -40,12 +41,13 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			if token == "" {
 				panic(errors.Unauthorized(EmptyOrInvalidToken, nil))
 			}
+			token = strings.Replace(token, "Bearer ", "", 1)
 			jwtUtils := r.Context().Value(JwtContextKey).(utils.JwtUtils)
 			userId, err := strconv.Atoi(jwtUtils.Verify(token))
 			if err != nil {
 				panic(err)
 			}
-			manager := r.Context().Value(PersistenceContextKey).(db.PersistenceManager)
+			manager := r.Context().Value(PersistenceContextKey).(*db.PersistenceManager)
 			var user model.UserModel
 			result := manager.DB.First(&user, userId)
 			if result.Error != nil {

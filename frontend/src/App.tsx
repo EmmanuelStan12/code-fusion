@@ -1,35 +1,60 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
+import {store} from "./redux/store.ts";
+import {BrowserRouter, Route, Routes} from "react-router";
+import Home from "./pages/Home.tsx";
+import Login from "./pages/Login.tsx";
+import Register from "./pages/Register.tsx";
+import Dashboard from "./pages/Dashboard.tsx";
+import {ToastContainer} from "react-toastify";
+import ProtectedRoute from "./components/ProtectedRoute.tsx";
+import {useEffect} from "react";
+import {useAppDispatch, useAppSelector} from "./redux/hooks.ts";
+import LocalStorage, {AUTH_TOKEN_KEY} from "./services/storage.service.ts";
+import * as authSlice from './features/auth/auth.slice.ts'
+import {AuthActionStatus} from "./features/auth/auth.actions.ts";
+import LoadingPage from "./components/LoadingPage.tsx";
+import AuthRoute from "./components/AuthRoute.tsx";
 
 function App() {
-  const [count, setCount] = useState(0)
+    const state = useAppSelector(state => state.auth)
+    const dispatch = useAppDispatch()
+    const status = state.status || AuthActionStatus.AUTHENTICATION_IN_PROGRESS
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    console.log(state)
+    useEffect(() => {
+        if (LocalStorage.get(AUTH_TOKEN_KEY) && !state?.data?.user) {
+            dispatch<any>(authSlice.getAuthUser())
+        }
+    }, []);
+
+    if (status === AuthActionStatus.AUTHENTICATION_IN_PROGRESS) {
+        return <LoadingPage />
+    }
+
+    return (
+        <>
+            <BrowserRouter>
+                <Routes>
+                    <Route index element={<Home/>}/>
+                    <Route element={<AuthRoute />}>
+                        <Route path="login" element={<Login/>}/>
+                        <Route path="register" element={<Register/>}/>
+                    </Route>
+
+                    <Route element={<ProtectedRoute/>}>
+                        <Route path="dashboard" element={<Dashboard/>}/>
+                    </Route>
+
+                    {/*<Route path="concerts">
+                            <Route index element={<ConcertsHome />} />
+                            <Route path=":city" element={<City />} />
+                            <Route path="trending" element={<Trending />} />
+                        </Route>*/}
+                </Routes>
+            </BrowserRouter>
+            <ToastContainer/>
+        </>
+    )
 }
 
 export default App

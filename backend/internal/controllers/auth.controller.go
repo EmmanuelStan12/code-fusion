@@ -24,11 +24,8 @@ type AuthController struct {
 
 func NewAuthController(context middleware.AppContext) *AuthController {
 	return &AuthController{
-		AuthService: &service.AuthService{
-			Manager: context.PersistenceManager,
-			Jwt:     context.Jwt,
-		},
-		Locale: context.LocaleConfig,
+		AuthService: service.NewAuthService(context.Jwt, context.PersistenceManager),
+		Locale:      context.LocaleConfig,
 	}
 }
 

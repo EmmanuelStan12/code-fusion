@@ -1,11 +1,18 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"database/sql"
+	"time"
+)
 
 type UserModel struct {
-	gorm.Model
-	Firstname string `json:"firstName"`
-	Lastname  string `json:"lastName"`
-	Email     string `json:"email"`
-	Password  string `json:"-"`
+	ID        uint         `gorm:"primarykey" json:"id"`
+	CreatedAt time.Time    `json:"createdAt"`
+	UpdatedAt time.Time    `json:"-"`
+	DeletedAt sql.NullTime `gorm:"index" json:"-"`
+	Firstname string       `json:"firstName"`
+	Lastname  string       `json:"lastName"`
+	Email     string       `json:"email"`
+	Username  string       `json:"username"`
+	Password  string       `json:"-"`
 }

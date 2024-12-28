@@ -7,10 +7,9 @@ import (
 	"net/http"
 )
 
-func NewAuthRouter(context middleware.AppContext) http.Handler {
+func NewUserRouter(context middleware.AppContext) http.Handler {
 	router := chi.NewRouter()
-	controller := controllers.NewAuthController(context)
-	router.Post("/login", controller.Login)
-	router.Post("/register", controller.Register)
+	controller := controllers.NewUserController(context)
+	router.Get("/me", controller.GetAuthUser)
 	return router
 }

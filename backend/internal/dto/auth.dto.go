@@ -12,6 +12,7 @@ type RegisterDTO struct {
 	Password  string `json:"password"`
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
+	Username  string `json:"username"`
 }
 
 type AuthDTO struct {

@@ -9,6 +9,7 @@ import (
 	"github.com/EmmanuelStan12/code-fusion/internal/model"
 	"github.com/EmmanuelStan12/code-fusion/internal/routes"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -56,6 +57,11 @@ func main() {
 		Logger:             logger,
 	}
 	mainRouter := chi.NewRouter()
+	mainRouter.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"https://*", "http://*"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+	}))
 	mainRouter.Use(middleware.ErrorMiddleware(localeConfig, logger))
 	mainRouter.Use(middleware.ContextMiddleware(appContext))
 	mainRouter.Use(middleware.RequestLoggerMiddleware(logger))
@@ -75,6 +81,7 @@ func main() {
 	})
 	mainRouter.Route("/api/v1", func(r chi.Router) {
 		r.Mount("/", routes.NewAuthRouter(appContext))
+		r.Mount("/users", routes.NewUserRouter(appContext))
 	})
 	mainRouter.NotFound(func(writer http.ResponseWriter, request *http.Request) {
 		utils.WriteResponse[any](
