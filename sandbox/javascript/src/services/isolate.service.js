@@ -1,6 +1,5 @@
 const ivm = require("isolated-vm");
 const {randomUUID} = require("crypto");
-const {ContextOutputStream} = require("../lib/stream.lib");
 
 class CodeFusionIsolate {
     static _instances = {}
@@ -48,15 +47,17 @@ class CodeFusionIsolate {
     }
 
     static disposeIsolates() {
-        for (const isolate of Object.values(this._instances)) {
-            isolate.dispose()
+        for (const [sessionId, instance] of Object.entries(this._instances)) {
+            instance.isolate.dispose()
+            delete this._instances[sessionId]
         }
     }
 
     static dispose(sessionId) {
-        const isolate = this._instances[sessionId]
-        if (isolate) {
-            isolate.dispose()
+        const instance = this._instances[sessionId]
+        if (instance && !instance.isDisposed) {
+            instance.isolate.dispose()
+            delete this._instances[sessionId]
         }
     }
 }

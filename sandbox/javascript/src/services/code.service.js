@@ -1,5 +1,6 @@
 const {randomUUID} = require("crypto");
 const {ContextOutputStream} = require("../lib/stream.lib");
+const Logger = require('../utils/logger.utils')
 
 const startupScript = `
     global.console = {
@@ -45,11 +46,14 @@ async function executeCode(codeProps, contextProps, options = { timeout: 60 * 10
             stack: e.stack,
         }
     }
-    return {
+    const data =  {
+        success: error === null,
         result,
         stdout: outputStream.output,
         error,
     }
+    Logger.instance.info(data)
+    return data
 }
 
 module.exports = {
