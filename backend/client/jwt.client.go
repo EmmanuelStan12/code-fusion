@@ -1,4 +1,4 @@
-package utils
+package client
 
 import (
 	"github.com/EmmanuelStan12/code-fusion/configs"
@@ -14,15 +14,15 @@ const (
 	ErrorInvalidSubject = "JWT_INVALID_SUBJECT"
 )
 
-type JwtUtils struct {
+type JwtClient struct {
 	configs.JwtConfig
 }
 
-func (config *JwtUtils) GetExp() int64 {
+func (config *JwtClient) GetExp() int64 {
 	return time.Now().Add(time.Hour * 24).Unix()
 }
 
-func (config *JwtUtils) Create(subject string) string {
+func (config *JwtClient) Create(subject string) string {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": subject,
 		"exp": config.GetExp(),
@@ -36,7 +36,7 @@ func (config *JwtUtils) Create(subject string) string {
 	return tkStr
 }
 
-func (config *JwtUtils) Verify(tkStr string) string {
+func (config *JwtClient) Verify(tkStr string) string {
 	token, err := jwt.Parse(tkStr, func(token *jwt.Token) (interface{}, error) {
 		return []byte(config.SecretKey), nil
 	})

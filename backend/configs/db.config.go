@@ -22,11 +22,11 @@ func (config *DBConfig) DSN() string {
 
 func InitDBConfig() DBConfig {
 	return DBConfig{
-		Name:     GetEnvVar("DB_NAME"),
-		User:     GetEnvVar("DB_USER"),
-		Password: GetEnvVar("DB_PASSWORD"),
-		Host:     GetEnvVar("DB_HOST"),
-		SSLMode:  GetEnvVar("DB_SSL_MODE"),
-		Port:     GetEnvVar("DB_PORT"),
+		Name:     GetEnvVar(EnvDBName),
+		User:     GetEnvVar(EnvDBUser),
+		Password: GetEnvVar(EnvDBPassword),
+		Host:     GetEnvVar(EnvDBHost),
+		SSLMode:  GetEnvVar(EnvSSLMode),
+		Port:     GetEnvVar(EnvDBPort),
 	}
 }

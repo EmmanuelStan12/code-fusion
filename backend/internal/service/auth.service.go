@@ -2,8 +2,8 @@ package service
 
 import (
 	"errors"
+	"github.com/EmmanuelStan12/code-fusion/client"
 	appErrors "github.com/EmmanuelStan12/code-fusion/internal/common/errors"
-	"github.com/EmmanuelStan12/code-fusion/internal/common/utils"
 	"github.com/EmmanuelStan12/code-fusion/internal/db"
 	"github.com/EmmanuelStan12/code-fusion/internal/dto"
 	"github.com/EmmanuelStan12/code-fusion/internal/model"
@@ -42,7 +42,7 @@ type AuthService struct {
 	BaseService
 }
 
-func NewAuthService(jwt utils.JwtUtils, manager *db.PersistenceManager) *AuthService {
+func NewAuthService(jwt client.JwtClient, manager *db.PersistenceManager) *AuthService {
 	authService := AuthService{}
 	authService.Jwt = jwt
 	authService.Manager = manager

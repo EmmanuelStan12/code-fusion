@@ -2,13 +2,14 @@ package middleware
 
 import (
 	"encoding/json"
+	"github.com/EmmanuelStan12/code-fusion/client"
 	"github.com/EmmanuelStan12/code-fusion/configs"
 	"github.com/EmmanuelStan12/code-fusion/internal/common/errors"
 	"github.com/EmmanuelStan12/code-fusion/internal/common/utils"
 	"net/http"
 )
 
-func ErrorMiddleware(localeConfig *configs.LocaleConfig, log *utils.Logger) func(http.Handler) http.Handler {
+func ErrorMiddleware(localeConfig *configs.LocaleConfig, log *client.Logger) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			defer func() {

@@ -5,6 +5,16 @@ import (
 	"os"
 )
 
+const (
+	EnvHostIP     = "HOST_IP"
+	EnvDBName     = "DB_NAME"
+	EnvDBUser     = "DB_USER"
+	EnvDBPassword = "DB_PASSWORD"
+	EnvDBHost     = "DB_HOST"
+	EnvSSLMode    = "SSL_MODE"
+	EnvDBPort     = "DB_PORT"
+)
+
 func LoadEnv() {
 	err := godotenv.Load()
 	if err != nil {

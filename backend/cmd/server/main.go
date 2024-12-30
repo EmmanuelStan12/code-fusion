@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/EmmanuelStan12/code-fusion/client"
 	"github.com/EmmanuelStan12/code-fusion/configs"
 	"github.com/EmmanuelStan12/code-fusion/internal/common/utils"
 	"github.com/EmmanuelStan12/code-fusion/internal/db"
@@ -46,15 +47,19 @@ func main() {
 	initMigrations(dbManager)
 	localePath := resolveResourcePath("messages.json")
 	localeConfig := configs.InitLocale(localePath)
-	jwt := utils.JwtUtils{
+	jwt := client.JwtClient{
 		JwtConfig: appConfig.JWT,
 	}
-	logger := utils.NewLogger(appConfig.LogLevel)
+	logger := client.NewLogger(appConfig.LogLevel)
+	dockerClient := client.NewDockerClient()
+	socketClient := client.NewWebSocketClient()
 	appContext := middleware.AppContext{
 		PersistenceManager: dbManager,
 		Jwt:                jwt,
 		LocaleConfig:       localeConfig,
 		Logger:             logger,
+		DockerClient:       dockerClient,
+		SocketClient:       socketClient,
 	}
 	mainRouter := chi.NewRouter()
 	mainRouter.Use(cors.Handler(cors.Options{

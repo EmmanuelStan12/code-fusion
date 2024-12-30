@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"github.com/EmmanuelStan12/code-fusion/internal/common/utils"
+	"github.com/EmmanuelStan12/code-fusion/client"
 	"net/http"
 	"time"
 )
@@ -23,7 +23,7 @@ func (rw *ResponseWriterWrapper) Write(data []byte) (int, error) {
 	return bytes, err
 }
 
-func RequestLoggerMiddleware(log *utils.Logger) func(http.Handler) http.Handler {
+func RequestLoggerMiddleware(log *client.Logger) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			startTime := time.Now()
@@ -40,7 +40,7 @@ func RequestLoggerMiddleware(log *utils.Logger) func(http.Handler) http.Handler 
 	}
 }
 
-func WriteLog(log *utils.Logger, status int, elapsed time.Duration, r *http.Request) {
+func WriteLog(log *client.Logger, status int, elapsed time.Duration, r *http.Request) {
 	log.Info(" %s %s %d %d milliseconds", r.Method, r.URL.Path, status, elapsed)
 
 	if status >= 400 {

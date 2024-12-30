@@ -2,8 +2,8 @@ package middleware
 
 import (
 	"context"
+	"github.com/EmmanuelStan12/code-fusion/client"
 	"github.com/EmmanuelStan12/code-fusion/internal/common/errors"
-	"github.com/EmmanuelStan12/code-fusion/internal/common/utils"
 	"github.com/EmmanuelStan12/code-fusion/internal/db"
 	"github.com/EmmanuelStan12/code-fusion/internal/model"
 	"net/http"
@@ -42,7 +42,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 				panic(errors.Unauthorized(EmptyOrInvalidToken, nil))
 			}
 			token = strings.Replace(token, "Bearer ", "", 1)
-			jwtUtils := r.Context().Value(JwtContextKey).(utils.JwtUtils)
+			jwtUtils := r.Context().Value(JwtContextKey).(client.JwtClient)
 			userId, err := strconv.Atoi(jwtUtils.Verify(token))
 			if err != nil {
 				panic(err)
