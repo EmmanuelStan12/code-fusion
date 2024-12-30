@@ -11,7 +11,7 @@ const (
 	ErrCannotMarshalSessionData              = "CANNOT_MARSHAL_SESSION_DATA"
 	ActionSessionInitialized      ActionType = "SESSION_INITIALIZED"
 	ActionSessionPaused           ActionType = "SESSION_PAUSED"
-	ActionSessionError            ActionType = "SESSION_PAUSED"
+	ActionSessionError            ActionType = "SESSION_ERROR"
 	ActionSessionClosed           ActionType = "SESSION_CLOSED"
 	ActionCollaboratorAdded       ActionType = "COLLABORATOR_ADDED"
 	ActionCollaboratorRemoved     ActionType = "COLLABORATOR_REMOVED"

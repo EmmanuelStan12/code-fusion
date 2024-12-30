@@ -10,19 +10,17 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"io"
 	"log"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"time"
 )
 
 const (
-	NodeSandboxImage = "node_sandbox"
+	NodeSandboxImage = "node_sandbox:latest"
 )
 
 type DockerContainerKey string
@@ -41,7 +39,6 @@ type DockerContainer struct {
 	ImageName           string
 	Port                string
 	Id                  string
-	Name                string
 	GrpcClient          *DockerGrpcClient
 	Results             map[GrpcResultKey]func(*proto.ExecuteCodeResponse)
 	CodeExecutionStream *CodeExecutionStream
@@ -74,12 +71,11 @@ func (dc *DockerClient) AddContainer(key DockerContainerKey, container *DockerCo
 func (dc *DockerClient) CanAllocateMoreTasks(imageName string) *DockerContainer {
 	dc.mu.RLock()
 	defer dc.mu.RUnlock()
-	for containerKey, con := range dc.Containers {
-		imageKey, containerId := GetIdsFromContainerKey(containerKey)
-		if imageKey != imageName {
+	for containerId, con := range dc.Containers {
+		if con.ImageName != imageName {
 			continue
 		}
-		stats, err := dc.Client.ContainerStats(context.Background(), containerId, false)
+		stats, err := dc.Client.ContainerStats(context.Background(), string(containerId), false)
 		if err != nil {
 			dc.Logger.Printf("Error getting container stats: %v", err)
 			continue
@@ -147,13 +143,25 @@ func NewDockerClient() *DockerClient {
 	}
 }
 
+func (dc *DockerClient) Dispose() error {
+	dc.mu.RLock()
+	defer dc.mu.RUnlock()
+	for containerId, _ := range dc.Containers {
+		err := dc.Client.ContainerRemove(context.Background(), string(containerId), container.RemoveOptions{})
+		if err != nil {
+			dc.Logger.Printf("Error getting container stats: %v", err)
+			return err
+		}
+	}
+	return nil
+}
+
 func (dc *DockerClient) createDockerContainer(imageName string) (*DockerContainer, error) {
 	ctx := context.Background()
 	port, err := dc.generateFreePort()
 	if err != nil {
 		return nil, err
 	}
-	containerName := fmt.Sprintf("%s-%s", imageName, uuid.New().String())
 	grpcPort := fmt.Sprintf("%d", port)
 	res, err := dc.Client.ContainerCreate(
 		ctx,
@@ -173,8 +181,17 @@ func (dc *DockerClient) createDockerContainer(imageName string) (*DockerContaine
 		},
 		nil,
 		nil,
-		containerName,
+		"",
 	)
+
+	err = dc.Client.ContainerStart(context.Background(), res.ID, container.StartOptions{})
+	if err != nil {
+		e := dc.Client.ContainerRemove(context.Background(), res.ID, container.RemoveOptions{})
+		if e != nil {
+			return nil, e
+		}
+		return nil, err
+	}
 
 	grpcConn, err := InitGrpcClient(dc.HostIP, grpcPort)
 
@@ -187,11 +204,11 @@ func (dc *DockerClient) createDockerContainer(imageName string) (*DockerContaine
 		ImageName:  imageName,
 		Port:       grpcPort,
 		Id:         res.ID,
-		Name:       containerName,
+		Results:    make(map[GrpcResultKey]func(*proto.ExecuteCodeResponse)),
 		GrpcClient: grpcConn,
 		Logger:     dc.Logger,
 	}
-	containerKey := GetDockerContainerKey(res.ID, imageName)
+	containerKey := DockerContainerKey(res.ID)
 	dc.Containers[containerKey] = dcContainer
 
 	return dcContainer, nil
@@ -208,6 +225,10 @@ func (dc *DockerClient) AllocateContainer(imageName string) (*DockerContainer, e
 		ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Second)
 
 		executionStream, err := InitCodeExecutionStream(con.GrpcClient.CodeClient, ctx)
+		if err != nil {
+			cancel()
+			return nil, err
+		}
 		con.CodeExecutionStream = executionStream
 
 		// There is a backpressure issue here, can cause memory issues
@@ -227,9 +248,7 @@ func (dc *DockerClient) AllocateContainer(imageName string) (*DockerContainer, e
 				callback, exists := con.Results[resultKey]
 				con.mu.RUnlock()
 				if exists {
-					go func() {
-						callback(result)
-					}()
+					go callback(result)
 				} else {
 					dc.Logger.Printf("Channel does not exist for key %v, ignoring result %v...", resultKey, result)
 				}
@@ -252,12 +271,10 @@ func (dc *DockerContainer) ExecuteCodeRequest(sessionId, contextId string, messa
 		dc.Logger.Printf("Invalid message format: %v\n", err)
 		return err
 	}
+	executeRequest.SessionId = sessionId
+	executeRequest.ContextId = contextId
 
 	resultKey := GenerateGrpcResultKey(sessionId, contextId)
-	err = dc.CodeExecutionStream.stream.Send(&executeRequest)
-	if err != nil {
-		return err
-	}
 
 	dc.mu.Lock()
 	dc.Results[resultKey] = callback
@@ -278,13 +295,4 @@ func (dc *DockerClient) generateFreePort() (int, error) {
 	defer listener.Close()
 	addr := listener.Addr().(*net.TCPAddr)
 	return addr.Port, nil
-}
-
-func GetDockerContainerKey(containerId, imageName string) DockerContainerKey {
-	return DockerContainerKey(fmt.Sprintf("%s:%s", containerId, imageName))
-}
-
-func GetIdsFromContainerKey(key DockerContainerKey) (string, string) {
-	r := strings.Split(string(key), ":")
-	return r[0], r[1]
 }

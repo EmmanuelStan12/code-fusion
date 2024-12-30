@@ -12,10 +12,9 @@ class CodeFusionIsolate {
         this._contextCount = 0
     }
 
-    async createContext(options) {
+    async createContext(contextId, options) {
         this._contextCount++
         const context = await this.isolate.createContext(options)
-        const contextId = randomUUID()
         this.contexts[contextId] = context
 
         return {

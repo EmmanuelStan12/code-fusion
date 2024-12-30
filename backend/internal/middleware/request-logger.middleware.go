@@ -27,6 +27,10 @@ func RequestLoggerMiddleware(log *client.Logger) func(http.Handler) http.Handler
 	return func(handler http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			startTime := time.Now()
+			if IsWSPath(r.URL.Path) {
+				handler.ServeHTTP(w, r)
+				return
+			}
 			writer := &ResponseWriterWrapper{
 				ResponseWriter: w,
 				StatusCode:     0,

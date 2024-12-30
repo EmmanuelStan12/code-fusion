@@ -32,7 +32,7 @@ func resolveResourcePath(name string) string {
 }
 
 func initMigrations(manager *db.PersistenceManager) {
-	manager.RegisterEntity(&model.UserModel{})
+	manager.RegisterEntity(&model.UserModel{}, &model.CodeSessionModel{})
 	manager.Migrate()
 }
 
@@ -52,6 +52,7 @@ func main() {
 	}
 	logger := client.NewLogger(appConfig.LogLevel)
 	dockerClient := client.NewDockerClient()
+	defer dockerClient.Dispose()
 	socketClient := client.NewWebSocketClient()
 	appContext := middleware.AppContext{
 		PersistenceManager: dbManager,
@@ -87,6 +88,7 @@ func main() {
 	mainRouter.Route("/api/v1", func(r chi.Router) {
 		r.Mount("/", routes.NewAuthRouter(appContext))
 		r.Mount("/users", routes.NewUserRouter(appContext))
+		r.Mount("/sessions", routes.NewCodeSessionRouter(appContext))
 	})
 	mainRouter.NotFound(func(writer http.ResponseWriter, request *http.Request) {
 		utils.WriteResponse[any](

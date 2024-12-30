@@ -10,8 +10,9 @@ import (
 func NewCodeSessionRouter(context middleware.AppContext) http.Handler {
 	router := chi.NewRouter()
 	controller := controllers.NewCodeSessionController(context)
-	router.Get("/sessions", controller.GetUserCodeSessions)
-	router.Post("/sessions/{sessionId}", controller.GetCodeSessionById)
-	router.Get("/sessions/create", controller.CreateSession)
+	router.Get("/", controller.GetUserCodeSessions)
+	router.Get("/{sessionId}", controller.GetCodeSessionById)
+	router.Post("/create", controller.CreateSession)
+	router.Get("/init/{sessionId}", controller.InitCodeSession)
 	return router
 }

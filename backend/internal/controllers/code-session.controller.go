@@ -12,7 +12,6 @@ import (
 	"github.com/EmmanuelStan12/code-fusion/internal/service"
 	"github.com/go-chi/chi/v5"
 	"net/http"
-	"strconv"
 )
 
 const (
@@ -35,12 +34,8 @@ func NewCodeSessionController(context middleware.AppContext) *CodeSessionControl
 }
 
 func (c *CodeSessionController) GetCodeSessionById(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "sessionId")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		panic(errors.BadRequest(ErrInvalidSessionId, err))
-	}
-	codeSession := c.CodeSessionService.GetCodeSessionById(id)
+	sessionId := chi.URLParam(r, "sessionId")
+	codeSession := c.CodeSessionService.GetCodeSessionById(sessionId)
 	utils.WriteResponse[model.CodeSessionModel](w, *codeSession, true, http.StatusOK, SessionsRetrieved, c.Locale)
 }
 
@@ -53,13 +48,19 @@ func (c *CodeSessionController) CreateSession(w http.ResponseWriter, r *http.Req
 		panic(errors.BadRequest(ErrDecoding, err))
 	}
 	session := c.CodeSessionService.CreateSession(user.ID, &data, dockerClient.Config)
-	socketClient := r.Context().Value(middleware.WebSocketClient).(*client.WebSocketClient)
-
-	socketClient.InitWebSocket(w, r, *session, dockerClient)
+	utils.WriteResponse[model.CodeSessionModel](w, *session, true, http.StatusOK, SessionsRetrieved, c.Locale)
 }
 
-func (c *CodeSessionController) GetCodeSessionsByUserId(w http.ResponseWriter, r *http.Request) {
+func (c *CodeSessionController) InitCodeSession(w http.ResponseWriter, r *http.Request) {
+	sessionId := chi.URLParam(r, "sessionId")
+	if sessionId == "" {
+		panic(errors.BadRequest(ErrInvalidSessionId, nil))
+	}
+	codeSession := c.CodeSessionService.GetCodeSessionById(sessionId)
+	socketClient := r.Context().Value(middleware.WebSocketClient).(*client.WebSocketClient)
+	dockerClient := r.Context().Value(middleware.DockerClientKey).(*client.DockerClient)
 
+	socketClient.InitWebSocket(w, r, *codeSession, dockerClient)
 }
 
 func (c *CodeSessionController) GetUserCodeSessions(w http.ResponseWriter, r *http.Request) {

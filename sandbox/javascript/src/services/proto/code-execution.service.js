@@ -6,18 +6,22 @@ const CodeExecutionService = {}
 
 CodeExecutionService.executeCode = function (call) {
     call.on('data', function (codeRequest) {
-        const { code, sessionId } = codeRequest;
+        Logger.instance.info('Data request ', codeRequest)
+        const { code, sessionId, contextId } = codeRequest;
 
         const isolate = CodeFusionIsolate.instance({ sessionId, config: defaultIsolateConfig });
 
-        isolate.createContext(defaultContextConfig).then(contextProps => {
+        isolate.createContext(contextId, defaultContextConfig).then(contextProps => {
             const codeProps = preProcessCode(code);
 
             executeCode(codeProps, contextProps, defaultCodeConfig).then(result => {
-                call.write({
+                const data = {
                     ...result,
+                    contextId: contextProps.contextId,
                     sessionId,
-                })
+                }
+                Logger.instance.info(`Executed code with result: `, data)
+                call.write(data)
             }).catch(err => {
                 Logger.instance.error('Error executing code:', err);
                 call.write({

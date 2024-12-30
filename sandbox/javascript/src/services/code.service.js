@@ -37,7 +37,7 @@ async function executeCode(codeProps, contextProps, options = { timeout: 60 * 10
     )
 
     const { code } = codeProps
-    let result, error = null
+    let result, error = ''
     try {
         result = await context.eval(code, options)
     } catch (e) {
@@ -46,14 +46,12 @@ async function executeCode(codeProps, contextProps, options = { timeout: 60 * 10
             stack: e.stack,
         }
     }
-    const data =  {
-        success: error === null,
+    return {
+        success: !error,
         result,
         stdout: outputStream.output,
         error,
     }
-    Logger.instance.info(data)
-    return data
 }
 
 module.exports = {

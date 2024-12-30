@@ -1,8 +1,45 @@
-import {useState} from "react";
+import {useEffect, useRef, useState} from "react";
 import '../App.css'
+import {useAppDispatch, useAppSelector} from "../redux/hooks.ts";
+import {useNavigate} from "react-router";
+import {CodeSessionActionStatus} from "../features/code-session/session.actions.ts";
+import {toast} from "react-toastify";
+import {BounceLoader} from "react-spinners";
+import * as sessionSlice from "../features/code-session/session.slice.ts";
+import {CreateSessionDTO} from "../features/code-session/session.api.ts";
 
 const Dashboard = () => {
     const [showDialog, setShowDialog] = useState(false)
+    const sessionTitleRef = useRef<any>()
+    const languageRef = useRef<any>()
+    const memoryLimitRef = useRef<any>()
+    const timeoutRef = useRef<any>()
+
+    const [isValid, setIsValid] = useState(false)
+    const dispatch = useAppDispatch()
+    const codeSessionState = useAppSelector(state => state.codeSession)
+    const navigate = useNavigate()
+
+    useEffect(() => {
+        if (codeSessionState.status === CodeSessionActionStatus.CREATE_SESSION_FAILED) {
+            toast.error(codeSessionState.message, {
+                position: 'top-right',
+                className: "text-base"
+            })
+        }
+        if (codeSessionState.status === CodeSessionActionStatus.CREATE_SESSION_SUCCESSFUL) {
+            toast.success(codeSessionState.message, {
+                position: 'top-right',
+                className: "text-base"
+            })
+            console.log(codeSessionState)
+            navigate(`/sessions/${codeSessionState.data.currentSession.sessionId}`)
+        }
+    }, [codeSessionState.status]);
+
+    const validateForm = () => {
+        setIsValid(sessionTitleRef?.current?.value && languageRef?.current?.value && memoryLimitRef?.current?.value && timeoutRef?.current?.value)
+    }
 
     const collaborators = [1, 2, 3, 4, 5, 6].map(i => ({
         lastActive: '0',
@@ -31,12 +68,15 @@ const Dashboard = () => {
         sessions,
     }
 
-    const navigateToSession = (sessionId) => {
-
-    }
-
     const createNewSession = () => {
+        const data: CreateSessionDTO = {
+            timeout: Number(timeoutRef.current.value || '0'),
+            memoryLimit: Number(memoryLimitRef.current.value || '0'),
+            language: languageRef.current?.value,
+            title: sessionTitleRef.current?.value
+        }
 
+        dispatch<any>(sessionSlice.createCodeSession(data))
     }
 
     return (
@@ -189,7 +229,7 @@ const Dashboard = () => {
             {/* Dialog for New Session */}
             {showDialog && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                    <div className="bg-white rounded-lg p-6 w-[90%] max-w-lg shadow-lg">
+                    <form onChange={validateForm} onSubmit={(e) => e.preventDefault()} className="bg-white rounded-lg p-6 w-[90%] max-w-lg shadow-lg">
                         <h2 className="text-2xl font-semibold text-gray-800 mb-4">
                             Create a New Session
                         </h2>
@@ -202,6 +242,7 @@ const Dashboard = () => {
                                     type="text"
                                     name="title"
                                     placeholder="Enter session title"
+                                    ref={sessionTitleRef}
                                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -211,6 +252,7 @@ const Dashboard = () => {
                                 </label>
                                 <select
                                     name="language"
+                                    ref={languageRef}
                                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                     <option value="JavaScript">JavaScript</option>
@@ -220,25 +262,34 @@ const Dashboard = () => {
                                 </select>
                             </div>
                             <div className="flex gap-4">
-                                <div>
+                                <div className="flex-1">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
                                         Memory Limit (MB)
                                     </label>
-                                    <input
-                                        type="number"
+                                    <select
                                         name="memoryLimit"
+                                        ref={memoryLimitRef}
                                         className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
+                                    >
+                                        <option value="8">8</option>
+                                        <option value="16">16</option>
+                                        <option value="32">32</option>
+                                        <option value="64">64</option>
+                                    </select>
                                 </div>
-                                <div>
+                                <div className="flex-1">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        CPU Limit (Cores)
+                                        Timeout (Seconds)
                                     </label>
-                                    <input
-                                        type="number"
-                                        name="cpuLimit"
+                                    <select
+                                        name="timeout"
+                                        ref={timeoutRef}
                                         className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
+                                    >
+                                        <option value="30">30</option>
+                                        <option value="60">60</option>
+                                        <option value="120">120</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -246,18 +297,30 @@ const Dashboard = () => {
                             <button
                                 className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md mr-4 hover:bg-gray-300"
                                 onClick={() => setShowDialog(false)}
+                                disabled={codeSessionState.status === CodeSessionActionStatus.CREATE_SESSION_IN_PROGRESS}
                             >
                                 Cancel
                             </button>
-                            <button
-                                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                                onClick={() => {
-                                }}
-                            >
-                                Create Session
-                            </button>
+
+                            {codeSessionState.status === CodeSessionActionStatus.CREATE_SESSION_IN_PROGRESS ? (
+                                <div className="flex justify-center items-center mt-7">
+                                    <BounceLoader
+                                        color="rgb(37, 99, 235)"
+                                        loading
+                                        size={40}
+                                    />
+                                </div>
+                            ) : (
+                                <button
+                                    className={`${!isValid ? 'bg-blue-100' : 'bg-blue-600'} text-white px-4 py-2 rounded-md`}
+                                    onClick={createNewSession}
+                                    disabled={!isValid}
+                                >
+                                    Create Session
+                                </button>
+                            )}
                         </div>
-                    </div>
+                    </form>
                 </div>
             )}
         </div>

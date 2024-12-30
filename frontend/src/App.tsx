@@ -14,6 +14,7 @@ import * as authSlice from './features/auth/auth.slice.ts'
 import {AuthActionStatus} from "./features/auth/auth.actions.ts";
 import LoadingPage from "./components/LoadingPage.tsx";
 import AuthRoute from "./components/AuthRoute.tsx";
+import CodeSession from "./pages/CodeSession.tsx";
 
 function App() {
     const state = useAppSelector(state => state.auth)
@@ -43,6 +44,7 @@ function App() {
 
                     <Route element={<ProtectedRoute/>}>
                         <Route path="dashboard" element={<Dashboard/>}/>
+                        <Route path="sessions/:sessionId" element={<CodeSession />} />
                     </Route>
 
                     {/*<Route path="concerts">

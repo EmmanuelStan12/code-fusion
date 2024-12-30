@@ -34,10 +34,21 @@ func RequireAuth(path string) bool {
 	return true
 }
 
+func IsWSPath(path string) bool {
+	exp := regexp.MustCompile("^/api/v1/sessions/init")
+	return exp.MatchString(path)
+}
+
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if RequireAuth(r.URL.Path) {
-			token := r.Header.Get("Authorization")
+			token := ""
+			if IsWSPath(r.URL.Path) {
+				queryParams := r.URL.Query()
+				token = queryParams.Get("token")
+			} else {
+				token = r.Header.Get("Authorization")
+			}
 			if token == "" {
 				panic(errors.Unauthorized(EmptyOrInvalidToken, nil))
 			}

@@ -5,6 +5,7 @@ option go_package = "github.com/EmmanuelStan12/code-fusion/backend/internal/prot
 message ExecuteCodeRequest {
   string code = 1;
   string sessionId = 2;
+  string contextId = 3;
 }
 
 message ExecuteCodeResponse {

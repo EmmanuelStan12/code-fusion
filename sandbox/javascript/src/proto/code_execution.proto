@@ -3,14 +3,16 @@ syntax = "proto3";
 message ExecuteCodeRequest {
   string code = 1;
   string sessionId = 2;
+  string contextId = 3;
 }
 
 message ExecuteCodeResponse {
   string sessionId = 1;
-  string result = 2;
-  bool success = 3;
-  string stdout = 4;
-  string error = 5;
+  string contextId = 2;
+  string result = 3;
+  bool success = 4;
+  string stdout = 5;
+  string error = 6;
 }
 
 service CodeExecutionService {

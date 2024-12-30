@@ -1,7 +1,5 @@
 package configs
 
-import "github.com/EmmanuelStan12/code-fusion/internal/common/utils"
-
 type DockerConfig struct {
 	Timeouts     []Timeout     `json:"timeouts"`
 	Languages    []Language    `json:"languages"`
@@ -37,13 +35,22 @@ func NewDockerConfig() *DockerConfig {
 }
 
 func (d *DockerConfig) IsValidTimeout(timeout Timeout) bool {
-	return utils.Contains[Timeout](d.Timeouts, timeout)
+	return Contains[Timeout](d.Timeouts, timeout*1000)
 }
 
 func (d *DockerConfig) IsValidMemoryLimit(memoryLimit MemoryLimit) bool {
-	return utils.Contains[MemoryLimit](d.MemoryLimits, memoryLimit)
+	return Contains[MemoryLimit](d.MemoryLimits, memoryLimit)
 }
 
 func (d *DockerConfig) IsValidLanguage(language Language) bool {
-	return utils.Contains[Language](d.Languages, language)
+	return Contains[Language](d.Languages, language)
+}
+
+func Contains[T comparable](slice []T, item T) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
 }

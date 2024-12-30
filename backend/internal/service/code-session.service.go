@@ -28,9 +28,9 @@ func NewCodeSessionService(manager *db.PersistenceManager) *CodeSessionService {
 	return &codeSessionService
 }
 
-func (css *CodeSessionService) GetCodeSessionById(sessionId int) *model.CodeSessionModel {
+func (css *CodeSessionService) GetCodeSessionById(sessionId string) *model.CodeSessionModel {
 	codeSession := model.CodeSessionModel{}
-	result := css.Manager.DB.Find(&codeSession, "sessionId = ?", sessionId)
+	result := css.Manager.DB.Find(&codeSession, "session_id = ?", sessionId)
 	if result.Error != nil {
 		panic(errors.InternalServerError("CAN_T_FIND_SESSIONS", result.Error))
 	}
