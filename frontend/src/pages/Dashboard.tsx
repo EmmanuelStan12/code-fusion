@@ -6,7 +6,11 @@ import {CodeSessionActionStatus} from "../features/code-session/session.actions.
 import {toast} from "react-toastify";
 import {BounceLoader} from "react-spinners";
 import * as sessionSlice from "../features/code-session/session.slice.ts";
+import * as dashboardSlice from "../features/dashboard/dashboard.slice.ts";
 import {CreateSessionDTO} from "../features/code-session/session.api.ts";
+import {DashboardActionStatus} from "../features/dashboard/dashboard.actions.ts";
+import LoadingPage from "../components/LoadingPage.tsx";
+import ErrorDialog from "../components/ErrorDialog.tsx";
 
 const Dashboard = () => {
     const [showDialog, setShowDialog] = useState(false)
@@ -18,6 +22,10 @@ const Dashboard = () => {
     const [isValid, setIsValid] = useState(false)
     const dispatch = useAppDispatch()
     const codeSessionState = useAppSelector(state => state.codeSession)
+    const auth = useAppSelector(state => state.auth)
+    const user = auth?.data?.user
+    const dashboardAnalytics = useAppSelector(state => state.dashboard)
+    const dashboardData = dashboardAnalytics?.data
     const navigate = useNavigate()
 
     useEffect(() => {
@@ -32,40 +40,17 @@ const Dashboard = () => {
                 position: 'top-right',
                 className: "text-base"
             })
-            console.log(codeSessionState)
-            navigate(`/sessions/${codeSessionState.data.currentSession.sessionId}`)
+            const { currentSession, collaborator } = codeSessionState?.data
+            navigate(`/sessions/${currentSession?.sessionId}`)
         }
     }, [codeSessionState.status]);
 
+    useEffect(() => {
+        dispatch<any>(dashboardSlice.fetchDashboard())
+    }, []);
+
     const validateForm = () => {
         setIsValid(sessionTitleRef?.current?.value && languageRef?.current?.value && memoryLimitRef?.current?.value && timeoutRef?.current?.value)
-    }
-
-    const collaborators = [1, 2, 3, 4, 5, 6].map(i => ({
-        lastActive: '0',
-        id: i,
-        username: `Random-collaborator-${i}`
-    }))
-
-    const sessions = [1, 2, 3, 4, 5, 6].map(i => ({
-        isActive: i % 2 === 0,
-        id: i,
-        title: `Random-${i}`,
-        language: 'JavaScript',
-        collaborators: collaborators,
-        memoryLimit: 256,
-    }))
-
-    const user = {
-        totalCodeTime: 100,
-        name: 'ByteBard',
-        activeSessions: sessions,
-        collaborators: collaborators,
-        sessionsPerLanguage: [1, 2, 4].map(i => ({
-            language: 'JavaScript',
-            count: i,
-        })),
-        sessions,
     }
 
     const createNewSession = () => {
@@ -79,11 +64,24 @@ const Dashboard = () => {
         dispatch<any>(sessionSlice.createCodeSession(data))
     }
 
+    const navigateToSession = (sessionId) => {
+        navigate(`/sessions/${sessionId}`)
+    }
+
+    if (!dashboardAnalytics.status || dashboardAnalytics.status === DashboardActionStatus.FETCH_DASHBOARD_IN_PROGRESS) {
+        return <LoadingPage />
+    }
+
+    console.log(dashboardAnalytics, dashboardData)
+    if (dashboardAnalytics?.status === DashboardActionStatus.FETCH_DASHBOARD_FAILED) {
+        return <ErrorDialog error={dashboardAnalytics.message} retryHandler={() => {}} />
+    }
+
     return (
         <div className="dashboard-container flex flex-col bg-gray-100 p-6">
             {/* Header */}
             <header className="flex items-center justify-between mb-6">
-                <h1 className="text-3xl font-bold text-blue-600">Welcome Back, {user.name}!</h1>
+                <h1 className="text-3xl font-bold text-blue-600">Welcome Back, {user?.username}!</h1>
                 <button
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700"
                     onClick={() => setShowDialog(true)}
@@ -103,9 +101,7 @@ const Dashboard = () => {
                             <div className="flex items-center justify-center">
                                 <i className="fas fa-clock text-blue-500 text-3xl mr-3"></i>
                                 <div>
-                    <span className="block text-2xl font-bold text-blue-500">
-                        {user.totalCodeTime} hrs
-                    </span>
+                                    <span className="block text-2xl font-bold text-blue-500">{dashboardData.analytics.totalMinutes} Minutes</span>
                                     <span className="text-gray-600">Total Coding Time</span>
                                 </div>
                             </div>
@@ -116,9 +112,7 @@ const Dashboard = () => {
                             <div className="flex items-center justify-center">
                                 <i className="fas fa-play-circle text-green-500 text-3xl mr-3"></i>
                                 <div>
-                    <span className="block text-2xl font-bold text-green-500">
-                        {user.activeSessions.length}
-                    </span>
+                                    <span className="block text-2xl font-bold text-green-500">{dashboardData.analytics.totalSessions}</span>
                                     <span className="text-gray-600">Active Sessions</span>
                                 </div>
                             </div>
@@ -129,9 +123,7 @@ const Dashboard = () => {
                             <div className="flex items-center justify-center">
                                 <i className="fas fa-users text-yellow-500 text-3xl mr-3"></i>
                                 <div>
-                    <span className="block text-2xl font-bold text-yellow-500">
-                        {user.collaborators.length}
-                    </span>
+                                    <span className="block text-2xl font-bold text-yellow-500">{dashboardData.recentCollaborators?.length}</span>
                                     <span className="text-gray-600">Collaborators</span>
                                 </div>
                             </div>
@@ -142,33 +134,12 @@ const Dashboard = () => {
                             <div className="flex items-center justify-center">
                                 <i className="fas fa-code text-red-500 text-3xl mr-3"></i>
                                 <div>
-                    <span className="block text-2xl font-bold text-red-500">
-                        {user.sessionsPerLanguage.length}
-                    </span>
+                                    <span className="block text-2xl font-bold text-red-500">{dashboardData.analytics.totalLanguagesUsed}</span>
                                     <span className="text-gray-600">Languages Used</span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </section>
-
-
-                {/* Language Sessions Section */}
-                <section className="flex-grow bg-white rounded-lg shadow-md p-6">
-                    <h2 className="text-xl font-semibold text-gray-800 mb-4">Sessions by Language</h2>
-                    <ul className="space-y-2">
-                        {user.sessionsPerLanguage.map((lang) => (
-                            <li
-                                key={lang.language}
-                                className="flex items-center justify-between p-3 rounded-lg bg-gray-50 shadow-inner"
-                            >
-                                <span className="text-gray-800 font-medium">{lang.language}</span>
-                                <span className="bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-sm font-bold">
-                                {lang.count} Sessions
-                            </span>
-                            </li>
-                        ))}
-                    </ul>
                 </section>
             </div>
 
@@ -176,7 +147,7 @@ const Dashboard = () => {
             <section className="mt-6 bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Recent Sessions</h2>
                 <ul className="space-y-4">
-                    {user.sessions.map((session) => (
+                    {dashboardData?.recentSessions?.map((session) => (
                         <li
                             key={session.id}
                             className="flex items-center justify-between p-4 bg-gray-50 rounded-lg shadow-sm"
@@ -185,7 +156,7 @@ const Dashboard = () => {
                                 <h3 className="text-lg font-bold text-gray-900">{session.title}</h3>
                                 <p className="text-sm text-gray-600">
                                     Language: {session.language} | Collaborators:{" "}
-                                    {session.collaborators.length} | Status:{" "}
+                                    {session?.collaborators?.length || 0} | Status:{" "}
                                     <span
                                         className={`font-bold ${
                                             session.isActive
@@ -199,7 +170,7 @@ const Dashboard = () => {
                             </div>
                             <button
                                 className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700"
-                                onClick={() => navigateToSession(session.id)}
+                                onClick={() => navigateToSession(session.sessionId)}
                             >
                                 Open Session
                             </button>
@@ -212,7 +183,7 @@ const Dashboard = () => {
             <section className="mt-6 bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Recent Collaborators</h2>
                 <ul className="space-y-3">
-                    {user.collaborators.map((collaborator) => (
+                    {dashboardData?.recentCollaborators?.map((collaborator) => (
                         <li
                             key={collaborator.id}
                             className="flex items-center justify-between p-3 bg-gray-50 rounded-lg shadow-inner"

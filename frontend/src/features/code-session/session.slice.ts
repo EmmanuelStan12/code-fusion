@@ -40,7 +40,8 @@ const CodeSessionSlice = createSlice({
             const payload = action.payload as object
 
             state.message = payload.message
-            state.data = { currentSession: payload.data }
+            const { session } = payload.data
+            state.data = { currentSession: session }
         })
 
         builder.addCase(createCodeSession.rejected, (state: CodeSessionState, action) => {
@@ -61,7 +62,8 @@ const CodeSessionSlice = createSlice({
             const payload = action.payload as object
 
             state.message = payload.message
-            state.data = { currentSession: payload.data }
+            const { session } = payload.data
+            state.data = { currentSession: session }
         })
 
         builder.addCase(fetchCodeSession.rejected, (state: CodeSessionState, action) => {

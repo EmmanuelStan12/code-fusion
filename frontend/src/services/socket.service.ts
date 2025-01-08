@@ -2,11 +2,6 @@ import {io} from "socket.io-client";
 import {WS_API_BASE_URL} from "../config/env.config.ts";
 import LocalStorage, {AUTH_TOKEN_KEY} from "./storage.service.ts";
 
-export interface ExecuteCodeRequestDTO {
-    sessionId: string
-    code: string
-}
-
 class IOSocket {
     private socket: any;
     private eventListeners: { [key: string]: Function[] } = {
