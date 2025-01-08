@@ -41,10 +41,7 @@ async function executeCode(codeProps, contextProps, options = { timeout: 60 * 10
     try {
         result = await context.eval(code, options)
     } catch (e) {
-        error = {
-            message: e.message,
-            stack: e.stack,
-        }
+        error = e.message || e.stack
     }
     return {
         success: !error,
