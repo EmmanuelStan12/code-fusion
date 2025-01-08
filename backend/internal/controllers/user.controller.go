@@ -29,3 +29,9 @@ func (controller *UserController) GetAuthUser(w http.ResponseWriter, r *http.Req
 	user := r.Context().Value(middleware.UserKey).(model.UserModel)
 	utils.WriteResponse[model.UserModel](w, user, true, http.StatusOK, UserRetrieved, controller.Locale)
 }
+
+func (controller *UserController) GetUsers(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value(middleware.UserKey).(model.UserModel)
+	result := controller.UserService.GetUsers(user)
+	utils.WriteResponse[[]model.UserModel](w, result, true, http.StatusOK, "USERS_RETRIEVED", controller.Locale)
+}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/EmmanuelStan12/code-fusion/configs"
+	"github.com/EmmanuelStan12/code-fusion/internal/model"
 	"github.com/EmmanuelStan12/code-fusion/internal/proto"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -243,7 +244,7 @@ func (dc *DockerClient) AllocateContainer(imageName string) (*DockerContainer, e
 					dc.Logger.Printf("Error receiving stream: %v\n", err)
 					return
 				}
-				resultKey := GenerateGrpcResultKey(result.SessionId, result.ContextId)
+				resultKey := GenerateGrpcResultKey(model.SessionId(result.SessionId), result.ContextId)
 				con.mu.RLock()
 				callback, exists := con.Results[resultKey]
 				con.mu.RUnlock()
@@ -264,14 +265,8 @@ func (dc *DockerClient) AllocateContainer(imageName string) (*DockerContainer, e
 	return con, nil
 }
 
-func (dc *DockerContainer) ExecuteCodeRequest(sessionId, contextId string, message []byte, callback func(response *proto.ExecuteCodeResponse)) error {
-	var executeRequest proto.ExecuteCodeRequest
-	err := json.Unmarshal(message, &executeRequest)
-	if err != nil {
-		dc.Logger.Printf("Invalid message format: %v\n", err)
-		return err
-	}
-	executeRequest.SessionId = sessionId
+func (dc *DockerContainer) ExecuteCodeRequest(sessionId model.SessionId, contextId string, executeRequest *proto.ExecuteCodeRequest, callback func(response *proto.ExecuteCodeResponse)) error {
+	executeRequest.SessionId = string(sessionId)
 	executeRequest.ContextId = contextId
 
 	resultKey := GenerateGrpcResultKey(sessionId, contextId)
@@ -279,7 +274,7 @@ func (dc *DockerContainer) ExecuteCodeRequest(sessionId, contextId string, messa
 	dc.mu.Lock()
 	dc.Results[resultKey] = callback
 	dc.mu.Unlock()
-	err = dc.CodeExecutionStream.stream.Send(&executeRequest)
+	err := dc.CodeExecutionStream.stream.Send(executeRequest)
 	if err != nil {
 		return err
 	}

@@ -1,9 +1,27 @@
 package model
 
+import "time"
+
+type CollaboratorID uint
+
+const (
+	RoleOwner        = "OWNER"
+	RoleCollaborator = "COLLABORATOR"
+
+	StatusActive   = "ACTIVE"
+	StatusInactive = "INACTIVE"
+)
+
 type CollaboratorModel struct {
-	ID            uint `gorm:"primarykey"`
-	CodeSessionId uint
-	CodeSession   CodeSessionModel `gorm:"foreignKey:CodeSessionId"`
-	UserId        uint
-	User          UserModel `gorm:"foreignKey:UserId"`
+	ID             CollaboratorID   `gorm:"primarykey" json:"id"`
+	CodeSessionId  uint             `json:"codeSessionId"`
+	CodeSession    CodeSessionModel `gorm:"foreignKey:CodeSessionId" json:"-"`
+	UserId         uint             `json:"userId"`
+	User           UserModel        `gorm:"foreignKey:UserId" json:"user"`
+	Role           string           `json:"role"`
+	LastActive     time.Time        `json:"lastActive"`
+	ActiveDuration uint             `json:"activeDuration"`
+}
+
+type CollaboratorDTO struct {
 }

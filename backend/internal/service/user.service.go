@@ -1,10 +1,12 @@
 package service
 
 import (
+	errors2 "errors"
 	"github.com/EmmanuelStan12/code-fusion/client"
 	"github.com/EmmanuelStan12/code-fusion/internal/common/errors"
 	"github.com/EmmanuelStan12/code-fusion/internal/db"
 	"github.com/EmmanuelStan12/code-fusion/internal/model"
+	"gorm.io/gorm"
 )
 
 const (
@@ -30,4 +32,17 @@ func (us *UserService) GetUserById(userId int) *model.UserModel {
 	}
 
 	return &user
+}
+
+func (s *UserService) GetUsers(user model.UserModel) []model.UserModel {
+	var users []model.UserModel
+
+	err := s.Manager.DB.Model(&model.UserModel{}).
+		Where("user_models.id <> ?", user.ID).
+		Scan(&users).Error
+
+	if err != nil && !errors2.Is(err, gorm.ErrRecordNotFound) {
+		panic(errors.InternalServerError("UNABLE_TO_RETRIEVE_USERS", err))
+	}
+	return users
 }

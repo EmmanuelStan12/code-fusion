@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"github.com/EmmanuelStan12/code-fusion/internal/model"
 	"github.com/EmmanuelStan12/code-fusion/internal/proto"
 	"strings"
 
@@ -30,7 +31,7 @@ func InitGrpcClient(ip string, port string) (*DockerGrpcClient, error) {
 }
 
 // GenerateGrpcResultKey generates a unique result key for gRPC communication.
-func GenerateGrpcResultKey(sessionId string, contextId string) GrpcResultKey {
+func GenerateGrpcResultKey(sessionId model.SessionId, contextId string) GrpcResultKey {
 	return GrpcResultKey(fmt.Sprintf("%s:%s", sessionId, contextId))
 }
 

@@ -15,9 +15,16 @@ import (
 )
 
 const (
-	ErrInvalidSessionId = "INVALID_SESSION_ID"
-	SessionsRetrieved   = "SESSIONS_RETRIEVED"
+	ErrInvalidSessionId      = "INVALID_SESSION_ID"
+	ErrInvalidCollaboratorId = "INVALID_COLLABORATOR_ID"
+	ErrCreatingSession       = "INVALID_SESSION_ID"
+	SessionsRetrieved        = "SESSIONS_RETRIEVED"
 )
+
+type CreateSessionDTO struct {
+	Session      model.CodeSessionModel  `json:"session"`
+	Collaborator model.CollaboratorModel `json:"collaborator"`
+}
 
 type CodeSessionController struct {
 	CodeSessionService *service.CodeSessionService
@@ -26,17 +33,20 @@ type CodeSessionController struct {
 
 func NewCodeSessionController(context middleware.AppContext) *CodeSessionController {
 	return &CodeSessionController{
-		CodeSessionService: &service.CodeSessionService{
-			Manager: context.PersistenceManager,
-		},
-		Locale: context.LocaleConfig,
+		CodeSessionService: service.NewCodeSessionService(context.PersistenceManager),
+		Locale:             context.LocaleConfig,
 	}
 }
 
 func (c *CodeSessionController) GetCodeSessionById(w http.ResponseWriter, r *http.Request) {
 	sessionId := chi.URLParam(r, "sessionId")
-	codeSession := c.CodeSessionService.GetCodeSessionById(sessionId)
-	utils.WriteResponse[model.CodeSessionModel](w, *codeSession, true, http.StatusOK, SessionsRetrieved, c.Locale)
+	if sessionId == "" {
+		panic(errors.BadRequest(ErrInvalidSessionId, nil))
+	}
+	user := r.Context().Value(middleware.UserKey).(model.UserModel)
+
+	codeSession := c.CodeSessionService.GetCodeSessionById(sessionId, user.ID)
+	utils.WriteResponse(w, *codeSession, true, http.StatusOK, SessionsRetrieved, c.Locale)
 }
 
 func (c *CodeSessionController) CreateSession(w http.ResponseWriter, r *http.Request) {
@@ -47,8 +57,14 @@ func (c *CodeSessionController) CreateSession(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		panic(errors.BadRequest(ErrDecoding, err))
 	}
-	session := c.CodeSessionService.CreateSession(user.ID, &data, dockerClient.Config)
-	utils.WriteResponse[model.CodeSessionModel](w, *session, true, http.StatusOK, SessionsRetrieved, c.Locale)
+	session, collaborator := c.CodeSessionService.CreateSession(user.ID, &data, dockerClient.Config)
+	if err != nil {
+		return
+	}
+	utils.WriteResponse[CreateSessionDTO](w, CreateSessionDTO{
+		Session:      *session,
+		Collaborator: *collaborator,
+	}, true, http.StatusOK, SessionsRetrieved, c.Locale)
 }
 
 func (c *CodeSessionController) InitCodeSession(w http.ResponseWriter, r *http.Request) {
@@ -56,11 +72,16 @@ func (c *CodeSessionController) InitCodeSession(w http.ResponseWriter, r *http.R
 	if sessionId == "" {
 		panic(errors.BadRequest(ErrInvalidSessionId, nil))
 	}
-	codeSession := c.CodeSessionService.GetCodeSessionById(sessionId)
+	user := r.Context().Value(middleware.UserKey).(model.UserModel)
+	codeSession := c.CodeSessionService.GetCodeSessionById(sessionId, user.ID)
 	socketClient := r.Context().Value(middleware.WebSocketClient).(*client.WebSocketClient)
 	dockerClient := r.Context().Value(middleware.DockerClientKey).(*client.DockerClient)
 
-	socketClient.InitWebSocket(w, r, *codeSession, dockerClient)
+	collaborator, err := c.CodeSessionService.FindCollaborator(codeSession.SessionId, user.ID)
+	if err != nil {
+		panic(errors.BadRequest(ErrInvalidSessionId, err))
+	}
+	socketClient.InitWebSocket(w, r, collaborator, *codeSession, dockerClient)
 }
 
 func (c *CodeSessionController) GetUserCodeSessions(w http.ResponseWriter, r *http.Request) {

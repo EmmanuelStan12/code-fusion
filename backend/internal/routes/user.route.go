@@ -11,5 +11,6 @@ func NewUserRouter(context middleware.AppContext) http.Handler {
 	router := chi.NewRouter()
 	controller := controllers.NewUserController(context)
 	router.Get("/me", controller.GetAuthUser)
+	router.Get("/", controller.GetUsers)
 	return router
 }
