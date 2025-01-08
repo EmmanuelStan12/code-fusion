@@ -1,0 +1,32 @@
+version: "3.8"
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - PORT=3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres-db
+
+  code-fusion-db:
+    image: postgres:15
+    container_name: postgres-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: code_fusion_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - code-fusion-data:/var/lib/postgresql/data
+volumes:
+  code-fusion-data:
