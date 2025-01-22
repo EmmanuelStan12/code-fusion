@@ -19,17 +19,17 @@ export function applyDiffs(localCode: string, diffs: Diff[]): string {
 
     for (const [operation, text] of diffs) {
         switch (operation) {
-            case DIFF_EQUAL: // Unchanged content
+            case DIFF_EQUAL:
                 result += localCode.slice(localIndex, localIndex + text.length);
                 localIndex += text.length;
                 break;
 
-            case DIFF_DELETE: // Content to remove
-                localIndex += text.length; // Skip over the deleted content
+            case DIFF_DELETE:
+                localIndex += text.length;
                 break;
 
-            case DIFF_INSERT: // Content to add
-                result += text; // Add the new content
+            case DIFF_INSERT:
+                result += text;
                 break;
         }
     }
