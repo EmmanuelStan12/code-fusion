@@ -2,9 +2,17 @@ import UserActions, {UserActionStatus} from "./users.actions.ts";
 import {createAsyncThunk, createSlice} from "@reduxjs/toolkit";
 import * as usersApi from "./users.api.ts";
 
+export interface IUser {
+    id: number
+    firstName: string
+    lastName: string
+    email: string
+    username: string
+}
+
 export interface UserState {
     status?: UserActionStatus
-    data?: { users: any[] }
+    data?: { users: IUser[] }
     message?: ''
     currentAction?: UserActions
 }

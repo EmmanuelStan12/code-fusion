@@ -42,8 +42,10 @@ class IOSocket {
     }
 
     dispose() {
+        console.log('Disposing...')
         if (this.socket) {
             this.socket.close();
+            this.socket = null;
         }
     }
 }

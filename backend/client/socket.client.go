@@ -1,8 +1,9 @@
 package client
 
 import (
-	"encoding/json"
+	"context"
 	errors2 "errors"
+	"github.com/EmmanuelStan12/code-fusion/configs"
 	"github.com/EmmanuelStan12/code-fusion/internal/common/errors"
 	"github.com/EmmanuelStan12/code-fusion/internal/db"
 	"github.com/EmmanuelStan12/code-fusion/internal/dto"
@@ -12,33 +13,21 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
 
 type WebSocketClient struct {
-	Manager  *db.PersistenceManager
-	Upgrade  *websocket.Upgrader
-	Sessions map[model.SessionId]WebSocketCollaborators
-	mu       sync.RWMutex
-}
-
-type WebSocketRequestMessage struct {
-	MessageType string                   `json:"messageType"`
-	Data        proto.ExecuteCodeRequest `json:"data"`
-	UserId      uint                     `json:"userId"`
-}
-
-type WebSocketResponseMessage[T any] struct {
-	MessageType string `json:"messageType"`
-	Data        T      `json:"data"`
+	Manager     *db.PersistenceManager
+	Upgrade     *websocket.Upgrader
+	Sessions    map[model.SessionId]WebSocketCollaborators
+	SessionCode map[model.SessionId]string
+	mu          sync.RWMutex
 }
 
 const (
-	ErrCannotInitWebSocket  = "CANNOT_INIT_WEB_SOCKET"
-	ErrCannotSendMessage    = "CANNOT_SEND_MESSAGE"
-	ErrInvalidMessageFormat = "INVALID_MESSAGE_FORMAT"
-	ErrCodeExecutionFailed  = "CODE_EXECUTION_FAILED"
+	ErrCannotInitWebSocket = "CANNOT_INIT_WEB_SOCKET"
 )
 
 type WebSocketCollaborator struct {
@@ -58,8 +47,9 @@ func NewWebSocketClient(manager *db.PersistenceManager) *WebSocketClient {
 				return true
 			},
 		},
-		Sessions: make(map[model.SessionId]WebSocketCollaborators),
-		Manager:  manager,
+		Sessions:    make(map[model.SessionId]WebSocketCollaborators),
+		SessionCode: make(map[model.SessionId]string),
+		Manager:     manager,
 	}
 }
 
@@ -68,21 +58,19 @@ func (client *WebSocketClient) InitWebSocket(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		panic(errors.InternalServerError(ErrCannotInitWebSocket, err))
 	}
-	socketCollaborator, err := client.AddCollaborator(session, collaborator, conn)
-	if err != nil {
-		panic(errors.InternalServerError(ErrCannotInitWebSocket, err))
-	}
-	go client.HandleConnection(conn, dockerClient, session, socketCollaborator)
+	go client.HandleConnection(conn, dockerClient, session, collaborator)
 }
 
 func (client *WebSocketClient) AddCollaborator(session model.CodeSessionModel, collaborator *model.CollaboratorModel, conn *websocket.Conn) (*WebSocketCollaborator, error) {
-	client.mu.Lock()
-	defer client.mu.Unlock()
-
 	collaborators := client.Sessions[session.SessionId]
 	if collaborators == nil {
 		collaborators = make(WebSocketCollaborators)
 		client.Sessions[session.SessionId] = collaborators
+	}
+
+	// this should not happen
+	if socketC, ok := collaborators[collaborator.ID]; ok {
+		return socketC, nil
 	}
 
 	webSocketCollaborator := &WebSocketCollaborator{
@@ -95,10 +83,8 @@ func (client *WebSocketClient) AddCollaborator(session model.CodeSessionModel, c
 	return webSocketCollaborator, nil
 }
 
+// IsCollaboratorActive Please call in a thread safe way to prevent deadlock
 func (client *WebSocketClient) IsCollaboratorActive(sessionId model.SessionId, collaboratorId model.CollaboratorID) bool {
-	client.mu.RLock()
-	defer client.mu.RUnlock()
-
 	collaborators := client.Sessions[sessionId]
 	if collaborators == nil {
 		return false
@@ -109,9 +95,6 @@ func (client *WebSocketClient) IsCollaboratorActive(sessionId model.SessionId, c
 }
 
 func (client *WebSocketClient) RemoveCollaborator(session model.CodeSessionModel, collaboratorID model.CollaboratorID) (*websocket.Conn, bool) {
-	client.mu.Lock()
-	defer client.mu.Unlock()
-
 	if collaborators, ok := client.Sessions[session.SessionId]; ok {
 		if collaborator, ok := collaborators[collaboratorID]; ok {
 			duration := time.Since(collaborator.CreatedAt)
@@ -121,7 +104,6 @@ func (client *WebSocketClient) RemoveCollaborator(session model.CodeSessionModel
 				Update("active_duration", activeDuration)
 			if result.Error != nil {
 				log.Printf("Error deleting or removing collaborator %+v\n", result.Error)
-				return nil, false
 			}
 
 			delete(collaborators, collaboratorID)
@@ -134,62 +116,104 @@ func (client *WebSocketClient) RemoveCollaborator(session model.CodeSessionModel
 	return nil, false
 }
 
-func (client *WebSocketClient) InitSession(conn *websocket.Conn, session model.CodeSessionModel, collaborator *WebSocketCollaborator) error {
-	err := conn.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO(session, dto.ActionSessionInitialized))
+/*func (client *WebSocketClient) AddSessionQueue(session model.CodeSessionModel) {
+	queue, ok := client.SessionQueues[session.SessionId]
+	if ok {
+		return
+	}
+	queue = NewCodeSessionQueue(session.SessionId, session.Code)
+	queue.RegisterDebounce(2*time.Second, func(code string) {
+		client.UpdateCollaborators(session, code)
+	})
+	client.SessionQueues[session.SessionId] = queue
+	queue.Start()
+}*/
+
+func (client *WebSocketClient) InitSession(conn *websocket.Conn, session model.CodeSessionModel, collaborator *model.CollaboratorModel) error {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+
+	_, err := client.AddCollaborator(session, collaborator, conn)
 	if err != nil {
 		return err
 	}
 
-	client.mu.RLock()
-	defer client.mu.RUnlock()
+	collaborators := client.Sessions[session.SessionId]
 
-	collaborators, ok := client.Sessions[session.SessionId]
-	if ok {
-		for cId, collab := range collaborators {
-			if cId == collaborator.Collaborator.ID {
-				continue
-			}
-			collab.Connection.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO[model.CollaboratorModel](*collaborator.Collaborator, dto.ActionCollaboratorActive))
+	_, ok := client.SessionCode[session.SessionId]
+	if !ok {
+		client.SessionCode[session.SessionId] = session.Code
+	}
+
+	for i := range session.Collaborators {
+		session.Collaborators[i].IsActive = client.IsCollaboratorActive(session.SessionId, session.Collaborators[i].ID)
+	}
+
+	code := client.SessionCode[session.SessionId]
+	session.Code = code
+
+	if err := conn.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO(session, dto.ActionSessionInitialized)); err != nil {
+		return err
+	}
+
+	collaborator.IsActive = true
+	activeMessage := dto.BuildWebSocketSessionDTO[model.CollaboratorModel](*collaborator, dto.ActionCollaboratorActive)
+	for cId, collab := range collaborators {
+		if cId == collaborator.ID {
+			continue
+		}
+		if err := collab.Connection.WriteMessage(websocket.TextMessage, activeMessage); err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-func (client *WebSocketClient) CloseSession(conn *websocket.Conn, session model.CodeSessionModel, collaborator *WebSocketCollaborator) {
-	client.RemoveCollaborator(session, collaborator.Collaborator.ID)
+func (client *WebSocketClient) CloseSession(conn *websocket.Conn, session model.CodeSessionModel, collaborator *model.CollaboratorModel) {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	client.RemoveCollaborator(session, collaborator.ID)
 	conn.Close()
 
-	client.mu.RLock()
-	defer client.mu.RUnlock()
+	collaborator.IsActive = false
+	collaborators, ok := client.Sessions[session.SessionId]
+	if ok {
+		for _, collab := range collaborators {
+			collab.Connection.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO[model.CollaboratorModel](*collaborator, dto.ActionCollaboratorInactive))
+		}
+	} else {
+		code, ok := client.SessionCode[session.SessionId]
+		if ok {
+			result := client.Manager.DB.Table("code_session_models").Where("code_session_models.session_id = ?", session.SessionId).
+				Update("code", code)
+			if result.Error != nil {
+				log.Printf("Error updating code %+v\n", result.Error)
+			}
+			delete(client.SessionCode, session.SessionId)
+		}
+		/*queue, ok := client.SessionQueues[session.SessionId]
+		if ok {
+			delete(client.SessionQueues, session.SessionId)
+			queue.CloseQueue()
+		}*/
+	}
+}
+
+func (client *WebSocketClient) UpdateCollaborators(session model.CodeSessionModel, collaborator *model.CollaboratorModel, message *dto.CodeUpdateMessage) {
+	client.mu.Lock()
+	defer client.mu.Unlock()
 
 	collaborators, ok := client.Sessions[session.SessionId]
 	if ok {
 		for _, collab := range collaborators {
-			collab.Connection.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO[model.CollaboratorModel](*collaborator.Collaborator, dto.ActionCollaboratorInactive))
-		}
-	}
-}
-
-func (client *WebSocketClient) UpdateSession(session model.CodeSessionModel, collaborator model.CollaboratorModel, code string) error {
-	client.mu.RLock()
-	defer client.mu.RUnlock()
-
-	collaborators, ok := client.Sessions[session.SessionId]
-	if ok {
-		for cId, collab := range collaborators {
-			if cId == collaborator.ID {
+			if collaborator.ID == collab.Collaborator.ID {
 				continue
 			}
-			collab.Connection.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO(struct {
-				Collaborator model.CollaboratorModel `json:"collaborator"`
-				Session      model.CodeSessionModel  `json:"session"`
-				Code         string                  `json:"code"`
-			}{Collaborator: collaborator, Session: session, Code: code}, dto.ActionCodeUpdate))
+			collab.Connection.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO(message, dto.ActionCodeUpdate))
 		}
 	}
-
-	return nil
+	client.SessionCode[session.SessionId] = message.Code
 }
 
 func (client *WebSocketClient) CreateCollaborator(session model.CodeSessionModel, userId uint, role string, status string) (*model.CollaboratorModel, error) {
@@ -224,19 +248,37 @@ func (client *WebSocketClient) CreateCollaborator(session model.CodeSessionModel
 	return &collaborator, nil
 }
 
-func (client *WebSocketClient) HandleConnection(conn *websocket.Conn, dockerClient *DockerClient, session model.CodeSessionModel, collaborator *WebSocketCollaborator) {
-	defer func() {
-		client.CloseSession(conn, session, collaborator)
-	}()
-	dockerCon, err := dockerClient.AllocateContainer(NodeSandboxImage)
+func (client *WebSocketClient) GetImageName(language string) string {
+	if strings.EqualFold(language, configs.LanguageJavaScript) || strings.EqualFold(language, configs.LanguageTypeScript) {
+		return NodeSandboxImage
+	}
+	if strings.EqualFold(language, configs.LanguagePython) {
+		return PythonSandboxImage
+	}
+	return ""
+}
+
+func (client *WebSocketClient) HandleConnection(conn *websocket.Conn, dockerClient *DockerClient, session model.CodeSessionModel, collaborator *model.CollaboratorModel) {
+	image := client.GetImageName(string(session.Language))
+	if image == "" {
+		dockerClient.Logger.Printf("Cannot find image with language: %s\n", session.Language)
+		return
+	}
+	dockerCon, err := dockerClient.AllocateContainer(image)
 	if err != nil {
+		log.Printf("An error occured %+v\n", err)
 		conn.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO(session, dto.ActionSessionError))
 		return
 	}
 
+	defer func() {
+		client.CloseSession(conn, session, collaborator)
+		CloseCodeSession(dockerClient, session, dockerCon)
+	}()
+
 	err = client.InitSession(conn, session, collaborator)
 	if err != nil {
-		dockerClient.Logger.Printf("Cannot write message: %v\n", err)
+		dockerClient.Logger.Printf("Cannot init session: %v\n", err)
 		return
 	}
 
@@ -251,42 +293,16 @@ func (client *WebSocketClient) HandleConnection(conn *websocket.Conn, dockerClie
 
 		switch messageType {
 		case websocket.TextMessage:
-			contextId := uuid.New().String()
-			var webSocketMessage WebSocketRequestMessage
-			err := json.Unmarshal(message, &webSocketMessage)
+			socketMessage, err := dto.ProcessWebSocketMessage(message)
 			if err != nil {
 				dockerClient.Logger.Printf("Invalid message format: %v\n", err)
-				err = conn.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO[any](nil, dto.ActionMessageTypeNotSupported))
+				conn.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO[any](nil, dto.ActionMessageTypeNotSupported))
 				continue
 			}
-
-			switch webSocketMessage.MessageType {
-			case string(dto.ActionCodeExecution):
-				err = dockerCon.ExecuteCodeRequest(session.SessionId, contextId, &webSocketMessage.Data, func(response *proto.ExecuteCodeResponse) {
-					dockerClient.Logger.Printf("Processed message: %v\n", response)
-					resultKey := GenerateGrpcResultKey(session.SessionId, contextId)
-
-					err = conn.WriteMessage(messageType, dto.BuildWebSocketSessionDTO(response, dto.ActionCodeExecutionSuccess))
-
-					dockerCon.mu.Lock()
-					delete(dockerCon.Results, resultKey)
-					dockerCon.mu.Unlock()
-				})
-
-			case string(dto.ActionAddCollaborator):
-				newCollaborator, err := client.CreateCollaborator(session, webSocketMessage.UserId, model.RoleCollaborator, model.StatusInactive)
-				if err != nil {
-					dockerClient.Logger.Printf("Unable to add collaborator: %v\n", err)
-					conn.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO[any](nil, dto.ActionAddCollaboratorError))
-					continue
-				}
-				conn.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO[model.CollaboratorModel](*newCollaborator, dto.ActionAddCollaboratorSuccess))
-
-			case string(dto.ActionCodeUpdate):
-				err := client.UpdateSession(session, *collaborator.Collaborator, webSocketMessage.Data.Code)
-				if err != nil {
-					dockerClient.Logger.Printf("Error updating code: %v\n", err)
-				}
+			client.HandleWebSocketMessageType(dockerCon, session, conn, socketMessage, collaborator)
+		case websocket.CloseMessage:
+			{
+				break
 			}
 		default:
 			dockerClient.Logger.Printf("Unsupported message type received: %d\n", messageType)
@@ -296,4 +312,60 @@ func (client *WebSocketClient) HandleConnection(conn *websocket.Conn, dockerClie
 			}
 		}
 	}
+}
+
+func (client *WebSocketClient) HandleWebSocketMessageType(
+	container *DockerContainer,
+	session model.CodeSessionModel,
+	conn *websocket.Conn,
+	message *dto.WebSocketRequestMessage,
+	collaborator *model.CollaboratorModel,
+) {
+	switch message.MessageType {
+	case string(dto.ActionCodeExecution):
+		contextId := uuid.New().String()
+
+		action, err := message.GetExecuteCodeMessage()
+		if err != nil {
+			conn.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO[any](nil, dto.ActionCannotDecodeActionType))
+			return
+		}
+		err = container.ExecuteCodeRequest(
+			session.SessionId,
+			contextId,
+			string(session.Language),
+			action,
+			func(response *proto.ExecuteCodeResponse) {
+				container.Logger.Printf("Processed message: %v\n", response)
+				resultKey := GenerateGrpcResultKey(session.SessionId, contextId)
+
+				conn.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO(response, dto.ActionCodeExecutionSuccess))
+				container.mu.Lock()
+				delete(container.Results, resultKey)
+				container.mu.Unlock()
+			})
+
+	case string(dto.ActionCodeUpdate):
+		action, err := message.GetCodeUpdateMessage()
+		container.Logger.Printf("Updating code: %v\n", err)
+		if err != nil {
+			conn.WriteMessage(websocket.TextMessage, dto.BuildWebSocketSessionDTO[any](nil, dto.ActionCannotDecodeActionType))
+			return
+		}
+		client.UpdateCollaborators(session, collaborator, action)
+	}
+}
+
+func CloseCodeSession(dockerClient *DockerClient, session model.CodeSessionModel, dockerCon *DockerContainer) {
+	ctx, cancel := context.WithCancel(context.Background())
+	dockerClient.Logger.Printf("Closing user session %s\n", session.SessionId)
+	_, err := dockerCon.GrpcClient.CodeClient.CloseSession(ctx, &proto.CloseSessionRequest{
+		SessionId: string(session.SessionId),
+	})
+	if err != nil {
+		dockerClient.Logger.Printf("Unable to close user session %+v\n", err)
+	} else {
+		dockerClient.Logger.Printf("Successfully closed user session %s\n", session.SessionId)
+	}
+	cancel()
 }

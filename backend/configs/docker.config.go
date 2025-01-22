@@ -19,6 +19,7 @@ const (
 
 	LanguageJavaScript = "JavaScript"
 	LanguageTypeScript = "TypeScript"
+	LanguagePython     = "Python"
 
 	MLMegaByte8  = 8
 	MLMegaByte16 = 16

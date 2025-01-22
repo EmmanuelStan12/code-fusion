@@ -12,6 +12,8 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"io"
 	"log"
 	"net"
@@ -21,7 +23,8 @@ import (
 )
 
 const (
-	NodeSandboxImage = "node_sandbox:latest"
+	NodeSandboxImage   = "node_sandbox:latest"
+	PythonSandboxImage = "python_sandbox:latest"
 )
 
 type DockerContainerKey string
@@ -148,10 +151,15 @@ func (dc *DockerClient) Dispose() error {
 	dc.mu.RLock()
 	defer dc.mu.RUnlock()
 	for containerId, _ := range dc.Containers {
-		err := dc.Client.ContainerRemove(context.Background(), string(containerId), container.RemoveOptions{})
+		err := dc.Client.ContainerRemove(context.Background(), string(containerId), container.RemoveOptions{
+			RemoveVolumes: true,
+			RemoveLinks:   true,
+			Force:         true,
+		})
 		if err != nil {
-			dc.Logger.Printf("Error getting container stats: %v", err)
-			return err
+			dc.Logger.Printf("Error getting container stats: %s\n", err)
+		} else {
+			dc.Logger.Printf("Successfully removed container: %s\n", containerId)
 		}
 	}
 	return nil
@@ -161,6 +169,7 @@ func (dc *DockerClient) createDockerContainer(imageName string) (*DockerContaine
 	ctx := context.Background()
 	port, err := dc.generateFreePort()
 	if err != nil {
+		log.Printf("Cannot generate free port %+v\n", err)
 		return nil, err
 	}
 	grpcPort := fmt.Sprintf("%d", port)
@@ -185,10 +194,17 @@ func (dc *DockerClient) createDockerContainer(imageName string) (*DockerContaine
 		"",
 	)
 
+	if err != nil {
+		log.Printf("Cannot create container %+v\n", err)
+		return nil, err
+	}
+
 	err = dc.Client.ContainerStart(context.Background(), res.ID, container.StartOptions{})
 	if err != nil {
+		log.Printf("Cannot start container %+v\n", err)
 		e := dc.Client.ContainerRemove(context.Background(), res.ID, container.RemoveOptions{})
 		if e != nil {
+			log.Printf("Cannot remove container %+v\n", err)
 			return nil, e
 		}
 		return nil, err
@@ -218,22 +234,33 @@ func (dc *DockerClient) createDockerContainer(imageName string) (*DockerContaine
 func (dc *DockerClient) AllocateContainer(imageName string) (*DockerContainer, error) {
 	con := dc.CanAllocateMoreTasks(imageName)
 	if con == nil {
-		con, err := dc.createDockerContainer(imageName)
+		newContainer, err := dc.createDockerContainer(imageName)
 		if err != nil {
+			log.Printf("Cannot allocate container %+v\n", err)
 			return nil, err
 		}
+		con = newContainer
+	}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Second)
+	err := WaitForServerReady(con.GrpcClient.GrpcClient, time.Minute)
+	if err != nil {
+		return nil, err
+	}
+
+	if con.CodeExecutionStream == nil {
+		ctx, cancel := context.WithCancel(context.Background())
 
 		executionStream, err := InitCodeExecutionStream(con.GrpcClient.CodeClient, ctx)
 		if err != nil {
 			cancel()
 			return nil, err
 		}
+		log.Printf("Initialized execution stream...")
 		con.CodeExecutionStream = executionStream
 
 		// There is a backpressure issue here, can cause memory issues
 		go func() {
+			defer cancel()
 			for {
 				result, err := executionStream.stream.Recv()
 				if err == io.EOF {
@@ -255,19 +282,21 @@ func (dc *DockerClient) AllocateContainer(imageName string) (*DockerContainer, e
 				}
 			}
 		}()
-
-		if err != nil {
-			return nil, err
-		}
-		return con, nil
 	}
 
 	return con, nil
 }
 
-func (dc *DockerContainer) ExecuteCodeRequest(sessionId model.SessionId, contextId string, executeRequest *proto.ExecuteCodeRequest, callback func(response *proto.ExecuteCodeResponse)) error {
+func (dc *DockerContainer) ExecuteCodeRequest(
+	sessionId model.SessionId,
+	contextId string,
+	language string,
+	executeRequest *proto.ExecuteCodeRequest,
+	callback func(response *proto.ExecuteCodeResponse),
+) error {
 	executeRequest.SessionId = string(sessionId)
 	executeRequest.ContextId = contextId
+	executeRequest.Language = language
 
 	resultKey := GenerateGrpcResultKey(sessionId, contextId)
 
@@ -290,4 +319,26 @@ func (dc *DockerClient) generateFreePort() (int, error) {
 	defer listener.Close()
 	addr := listener.Addr().(*net.TCPAddr)
 	return addr.Port, nil
+}
+
+func WaitForServerReady(conn *grpc.ClientConn, timeout time.Duration) error {
+	healthClient := grpc_health_v1.NewHealthClient(conn)
+	deadline := time.Now().Add(timeout)
+
+	for time.Now().Before(deadline) {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+
+		resp, err := healthClient.Check(ctx, &grpc_health_v1.HealthCheckRequest{Service: "CODE_EXECUTION_SERVICE"})
+		if err == nil && resp.Status == grpc_health_v1.HealthCheckResponse_SERVING {
+			log.Println("gRPC server is healthy and ready.")
+			cancel()
+			return nil
+		}
+
+		log.Printf("Waiting for gRPC server to be ready: %v\n", err)
+		cancel()
+		time.Sleep(2 * time.Second)
+	}
+
+	return fmt.Errorf("gRPC server did not become ready within the timeout")
 }

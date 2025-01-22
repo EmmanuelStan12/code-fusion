@@ -3,6 +3,7 @@ const protoLoader = require('@grpc/proto-loader')
 const { protoBufConfig } = require('./config/config')
 const CodeExecutionService = require('./services/proto/code-execution.service')
 const Logger = require('./utils/logger.utils')
+const health = require('grpc-health-check');
 
 const loadProtoFile = (filePath) => {
     const packageDefinition = protoLoader.loadSync(
@@ -26,6 +27,10 @@ class App {
 
         const descriptor = loadProtoFile(codeExecutionProto)
 
+        const healthService = new health.HealthImplementation({
+            'CODE_EXECUTION_SERVICE': 'SERVING',
+        });
+        healthService.addToServer(this.server)
         this.server.addService(descriptor.CodeExecutionService.service, CodeExecutionService)
     }
 

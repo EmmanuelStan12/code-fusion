@@ -59,6 +59,11 @@ class CodeFusionIsolate {
             delete this._instances[sessionId]
         }
     }
+
+    static hasSession(sessionId) {
+        const instance = this._instances[sessionId]
+        return !instance
+    }
 }
 
 module.exports = {

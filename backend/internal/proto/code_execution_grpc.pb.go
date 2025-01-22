@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CodeExecutionService_ExecuteCode_FullMethodName = "/CodeExecutionService/ExecuteCode"
+	CodeExecutionService_ExecuteCode_FullMethodName  = "/CodeExecutionService/ExecuteCode"
+	CodeExecutionService_CloseSession_FullMethodName = "/CodeExecutionService/CloseSession"
 )
 
 // CodeExecutionServiceClient is the client API for CodeExecutionService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CodeExecutionServiceClient interface {
 	ExecuteCode(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExecuteCodeRequest, ExecuteCodeResponse], error)
+	CloseSession(ctx context.Context, in *CloseSessionRequest, opts ...grpc.CallOption) (*CloseSessionResponse, error)
 }
 
 type codeExecutionServiceClient struct {
@@ -50,11 +52,22 @@ func (c *codeExecutionServiceClient) ExecuteCode(ctx context.Context, opts ...gr
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type CodeExecutionService_ExecuteCodeClient = grpc.BidiStreamingClient[ExecuteCodeRequest, ExecuteCodeResponse]
 
+func (c *codeExecutionServiceClient) CloseSession(ctx context.Context, in *CloseSessionRequest, opts ...grpc.CallOption) (*CloseSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CloseSessionResponse)
+	err := c.cc.Invoke(ctx, CodeExecutionService_CloseSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CodeExecutionServiceServer is the server API for CodeExecutionService service.
 // All implementations must embed UnimplementedCodeExecutionServiceServer
 // for forward compatibility.
 type CodeExecutionServiceServer interface {
 	ExecuteCode(grpc.BidiStreamingServer[ExecuteCodeRequest, ExecuteCodeResponse]) error
+	CloseSession(context.Context, *CloseSessionRequest) (*CloseSessionResponse, error)
 	mustEmbedUnimplementedCodeExecutionServiceServer()
 }
 
@@ -67,6 +80,9 @@ type UnimplementedCodeExecutionServiceServer struct{}
 
 func (UnimplementedCodeExecutionServiceServer) ExecuteCode(grpc.BidiStreamingServer[ExecuteCodeRequest, ExecuteCodeResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method ExecuteCode not implemented")
+}
+func (UnimplementedCodeExecutionServiceServer) CloseSession(context.Context, *CloseSessionRequest) (*CloseSessionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CloseSession not implemented")
 }
 func (UnimplementedCodeExecutionServiceServer) mustEmbedUnimplementedCodeExecutionServiceServer() {}
 func (UnimplementedCodeExecutionServiceServer) testEmbeddedByValue()                              {}
@@ -96,13 +112,36 @@ func _CodeExecutionService_ExecuteCode_Handler(srv interface{}, stream grpc.Serv
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type CodeExecutionService_ExecuteCodeServer = grpc.BidiStreamingServer[ExecuteCodeRequest, ExecuteCodeResponse]
 
+func _CodeExecutionService_CloseSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CloseSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeExecutionServiceServer).CloseSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeExecutionService_CloseSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeExecutionServiceServer).CloseSession(ctx, req.(*CloseSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CodeExecutionService_ServiceDesc is the grpc.ServiceDesc for CodeExecutionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var CodeExecutionService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "CodeExecutionService",
 	HandlerType: (*CodeExecutionServiceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CloseSession",
+			Handler:    _CodeExecutionService_CloseSession_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "ExecuteCode",

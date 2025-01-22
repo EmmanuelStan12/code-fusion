@@ -1,4 +1,7 @@
+import {useNavigate} from "react-router";
+
 function Home() {
+    const navigate = useNavigate()
 
     return (
         <div className="home-page w-full bg-gray-900 text-gray-100 p-10">
@@ -15,7 +18,7 @@ function Home() {
                 <p className="text-lg text-gray-300 mt-5">
                     Empowering developers with real-time code execution, seamless collaboration, and a secure sandbox environment.
                 </p>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 mt-8 rounded-lg shadow-lg">
+                <button onClick={() => navigate('/login')} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 mt-8 rounded-lg shadow-lg">
                     Get Started
                 </button>
             </section>

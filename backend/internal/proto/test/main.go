@@ -10,7 +10,6 @@ import (
 	"log"
 	"math/rand"
 	"strconv"
-	"time"
 )
 
 func main() {
@@ -21,8 +20,7 @@ func main() {
 	defer conn.Close()
 	client := pb.NewCodeExecutionServiceClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Second)
-
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	stream, err := client.ExecuteCode(ctx)

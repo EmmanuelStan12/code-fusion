@@ -26,4 +26,8 @@ export default class LocalStorage {
     static del(key: string) {
         localStorage.removeItem(key)
     }
+
+    static clear() {
+        localStorage.clear()
+    }
 }

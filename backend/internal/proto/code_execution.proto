@@ -4,8 +4,9 @@ option go_package = "github.com/EmmanuelStan12/code-fusion/backend/internal/prot
 
 message ExecuteCodeRequest {
   string code = 1;
-  string sessionId = 2;
-  string contextId = 3;
+  string language = 2;
+  string sessionId = 3;
+  string contextId = 4;
 }
 
 message ExecuteCodeResponse {
@@ -17,6 +18,17 @@ message ExecuteCodeResponse {
   string error = 6;
 }
 
+message CloseSessionRequest {
+  string sessionId = 1;
+}
+
+message CloseSessionResponse {
+  string sessionId = 1;
+  bool success = 2;
+  string error = 3;
+}
+
 service CodeExecutionService {
   rpc ExecuteCode(stream ExecuteCodeRequest) returns (stream ExecuteCodeResponse) {}
+  rpc CloseSession(CloseSessionRequest) returns (CloseSessionResponse) {}
 }

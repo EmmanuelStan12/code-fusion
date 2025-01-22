@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/EmmanuelStan12/code-fusion/internal/model"
 	"github.com/EmmanuelStan12/code-fusion/internal/proto"
+	"log"
 	"strings"
 
 	"google.golang.org/grpc"
@@ -21,6 +22,7 @@ type DockerGrpcClient struct {
 func InitGrpcClient(ip string, port string) (*DockerGrpcClient, error) {
 	conn, err := grpc.NewClient(fmt.Sprintf("%s:%s", ip, port), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
+		log.Printf("Cannot init grpc client for port: %s, %+v\n", port, err)
 		return nil, err
 	}
 	codeClient := proto.NewCodeExecutionServiceClient(conn)

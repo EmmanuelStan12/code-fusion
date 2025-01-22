@@ -63,10 +63,8 @@ func isValidPassword(hashedPassword, password string) bool {
 }
 
 func (s *AuthService) Login(data *dto.LoginDTO) dto.AuthDTO {
-	user := model.UserModel{
-		Email: data.Email,
-	}
-	result := s.Manager.DB.First(&user)
+	var user model.UserModel
+	result := s.Manager.DB.Where("email = ?", data.Email).First(&user)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			panic(appErrors.Unauthorized(ErrInvalidEmailOrPassword, nil))

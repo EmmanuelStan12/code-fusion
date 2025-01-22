@@ -32,7 +32,15 @@ export const getAuthUser = createAsyncThunk(
 const AuthSlice = createSlice({
     name: AUTH_SLICE_NAME,
     initialState,
-    reducers: {} as any,
+    reducers: {
+        clear: (state: AuthState) => {
+            LocalStorage.del(AUTH_TOKEN_KEY)
+            state.data = undefined
+            state.status = undefined
+            state.currentAction = AuthActions.LOGIN
+            state.message = ''
+        }
+    } as any,
     extraReducers: (builder) => {
         builder.addCase(login.pending, (state: AuthState, action) => {
             state.status = AuthActionStatus.LOGIN_IN_PROGRESS
@@ -103,4 +111,5 @@ const AuthSlice = createSlice({
     }
 })
 
+export const { clear } = AuthSlice.actions
 export default AuthSlice.reducer

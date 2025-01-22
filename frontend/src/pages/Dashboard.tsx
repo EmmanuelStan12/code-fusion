@@ -11,15 +11,14 @@ import {CreateSessionDTO} from "../features/code-session/session.api.ts";
 import {DashboardActionStatus} from "../features/dashboard/dashboard.actions.ts";
 import LoadingPage from "../components/LoadingPage.tsx";
 import ErrorDialog from "../components/ErrorDialog.tsx";
+import AddSessionDialog from "../components/AddSessionDialog.tsx";
+import * as usersSlice from "../features/users/users.slice.ts";
+import LocalStorage from "../services/storage.service.ts";
+import * as authSlice from "../features/auth/auth.slice.ts";
 
 const Dashboard = () => {
     const [showDialog, setShowDialog] = useState(false)
-    const sessionTitleRef = useRef<any>()
-    const languageRef = useRef<any>()
-    const memoryLimitRef = useRef<any>()
-    const timeoutRef = useRef<any>()
 
-    const [isValid, setIsValid] = useState(false)
     const dispatch = useAppDispatch()
     const codeSessionState = useAppSelector(state => state.codeSession)
     const auth = useAppSelector(state => state.auth)
@@ -36,29 +35,26 @@ const Dashboard = () => {
             })
         }
         if (codeSessionState.status === CodeSessionActionStatus.CREATE_SESSION_SUCCESSFUL) {
-            toast.success(codeSessionState.message, {
+            toast.success(codeSessionState.message || 'Created session successfully', {
                 position: 'top-right',
                 className: "text-base"
             })
             const { currentSession, collaborator } = codeSessionState?.data
-            navigate(`/sessions/${currentSession?.sessionId}`)
+            navigate(`/sessions/${currentSession?.sessionId}?new=true`)
         }
     }, [codeSessionState.status]);
 
     useEffect(() => {
         dispatch<any>(dashboardSlice.fetchDashboard())
+        dispatch<any>(usersSlice.fetchUsers())
     }, []);
 
-    const validateForm = () => {
-        setIsValid(sessionTitleRef?.current?.value && languageRef?.current?.value && memoryLimitRef?.current?.value && timeoutRef?.current?.value)
-    }
-
-    const createNewSession = () => {
+    const createNewSession = (language, title, collaborators) => {
+        console.log(language, title, collaborators)
         const data: CreateSessionDTO = {
-            timeout: Number(timeoutRef.current.value || '0'),
-            memoryLimit: Number(memoryLimitRef.current.value || '0'),
-            language: languageRef.current?.value,
-            title: sessionTitleRef.current?.value
+            language,
+            title,
+            collaboratorIds: collaborators,
         }
 
         dispatch<any>(sessionSlice.createCodeSession(data))
@@ -68,11 +64,15 @@ const Dashboard = () => {
         navigate(`/sessions/${sessionId}`)
     }
 
+    const handleLogout = () => {
+        dispatch<any>(authSlice.clear())
+        navigate('/login')
+    }
+
     if (!dashboardAnalytics.status || dashboardAnalytics.status === DashboardActionStatus.FETCH_DASHBOARD_IN_PROGRESS) {
         return <LoadingPage />
     }
 
-    console.log(dashboardAnalytics, dashboardData)
     if (dashboardAnalytics?.status === DashboardActionStatus.FETCH_DASHBOARD_FAILED) {
         return <ErrorDialog error={dashboardAnalytics.message} retryHandler={() => {}} />
     }
@@ -82,12 +82,21 @@ const Dashboard = () => {
             {/* Header */}
             <header className="flex items-center justify-between mb-6">
                 <h1 className="text-3xl font-bold text-blue-600">Welcome Back, {user?.username}!</h1>
-                <button
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700"
-                    onClick={() => setShowDialog(true)}
-                >
-                    + Create New Session
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700"
+                        onClick={() => setShowDialog(true)}
+                    >
+                        + Create New Session
+                    </button>
+
+                    <button
+                        className="bg-red-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-red-700"
+                        onClick={handleLogout}
+                    >
+                        Logout
+                    </button>
+                </div>
             </header>
 
             {/* Main Content */}
@@ -156,16 +165,7 @@ const Dashboard = () => {
                                 <h3 className="text-lg font-bold text-gray-900">{session.title}</h3>
                                 <p className="text-sm text-gray-600">
                                     Language: {session.language} | Collaborators:{" "}
-                                    {session?.collaborators?.length || 0} | Status:{" "}
-                                    <span
-                                        className={`font-bold ${
-                                            session.isActive
-                                                ? "text-green-600"
-                                                : "text-red-600"
-                                        }`}
-                                    >
-                                    {session.isActive ? "Active" : "Inactive"}
-                                </span>
+                                    {session?.collaborators?.length || 0}
                                 </p>
                             </div>
                             <button
@@ -188,9 +188,9 @@ const Dashboard = () => {
                             key={collaborator.id}
                             className="flex items-center justify-between p-3 bg-gray-50 rounded-lg shadow-inner"
                         >
-                            <span>{collaborator.username}</span>
+                            <span>{collaborator.user.username}</span>
                             <span className="text-sm text-gray-500">
-                            Last Active: {collaborator.lastActive}
+                            Last Active: {new Date(collaborator.lastActive).toLocaleString()}
                         </span>
                         </li>
                     ))}
@@ -198,102 +198,12 @@ const Dashboard = () => {
             </section>
 
             {/* Dialog for New Session */}
-            {showDialog && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                    <form onChange={validateForm} onSubmit={(e) => e.preventDefault()} className="bg-white rounded-lg p-6 w-[90%] max-w-lg shadow-lg">
-                        <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-                            Create a New Session
-                        </h2>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Session Title
-                                </label>
-                                <input
-                                    type="text"
-                                    name="title"
-                                    placeholder="Enter session title"
-                                    ref={sessionTitleRef}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Programming Language
-                                </label>
-                                <select
-                                    name="language"
-                                    ref={languageRef}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <option value="JavaScript">JavaScript</option>
-                                    <option value="Python">Python</option>
-                                    <option value="TypeScript">TypeScript</option>
-                                    <option value="Go">Go</option>
-                                </select>
-                            </div>
-                            <div className="flex gap-4">
-                                <div className="flex-1">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Memory Limit (MB)
-                                    </label>
-                                    <select
-                                        name="memoryLimit"
-                                        ref={memoryLimitRef}
-                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        <option value="8">8</option>
-                                        <option value="16">16</option>
-                                        <option value="32">32</option>
-                                        <option value="64">64</option>
-                                    </select>
-                                </div>
-                                <div className="flex-1">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Timeout (Seconds)
-                                    </label>
-                                    <select
-                                        name="timeout"
-                                        ref={timeoutRef}
-                                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        <option value="30">30</option>
-                                        <option value="60">60</option>
-                                        <option value="120">120</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex justify-end mt-6">
-                            <button
-                                className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md mr-4 hover:bg-gray-300"
-                                onClick={() => setShowDialog(false)}
-                                disabled={codeSessionState.status === CodeSessionActionStatus.CREATE_SESSION_IN_PROGRESS}
-                            >
-                                Cancel
-                            </button>
-
-                            {codeSessionState.status === CodeSessionActionStatus.CREATE_SESSION_IN_PROGRESS ? (
-                                <div className="flex justify-center items-center mt-7">
-                                    <BounceLoader
-                                        color="rgb(37, 99, 235)"
-                                        loading
-                                        size={40}
-                                    />
-                                </div>
-                            ) : (
-                                <button
-                                    className={`${!isValid ? 'bg-blue-100' : 'bg-blue-600'} text-white px-4 py-2 rounded-md`}
-                                    onClick={createNewSession}
-                                    disabled={!isValid}
-                                >
-                                    Create Session
-                                </button>
-                            )}
-                        </div>
-                    </form>
-                </div>
-            )}
+            <AddSessionDialog
+                showDialog={showDialog}
+                setShowDialog={setShowDialog}
+                codeSessionState={codeSessionState}
+                createNewSession={createNewSession}
+            />
         </div>
     );
 }

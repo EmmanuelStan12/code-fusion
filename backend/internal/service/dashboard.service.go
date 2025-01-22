@@ -57,9 +57,10 @@ func (s *AnalyticsService) GetRecentSessions(user model.UserModel) []model.CodeS
 
 	err := s.Manager.DB.
 		Model(&model.CodeSessionModel{}).
+		Preload("Collaborators").
 		Select("code_session_models.*").
 		Joins("LEFT JOIN collaborator_models c ON code_session_models.id = c.code_session_id").
-		Where("c.user_id = ? AND c.role = ?", user.ID, model.RoleOwner).
+		Where("c.user_id = ?", user.ID).
 		Order("code_session_models.created_at DESC").
 		Limit(10).
 		Find(&sessions).Error
@@ -75,12 +76,13 @@ func (s *AnalyticsService) GetRecentCollaborators(user model.UserModel) []model.
 	var collaborators []model.CollaboratorModel
 
 	err := s.Manager.DB.Model(&model.CollaboratorModel{}).
+		Preload("User").
 		Select("others.*").
 		Joins("LEFT JOIN code_session_models cs ON cs.id = collaborator_models.code_session_id").
 		Joins(`LEFT JOIN collaborator_models others 
 					ON others.code_session_id = cs.id
 		`).
-		Where("collaborator_models.user_id = ? AND collaborator_models.role = ? AND others.user_id <> ?", user.ID, model.RoleOwner, user.ID).
+		Where("collaborator_models.user_id = ? AND others.user_id <> ?", user.ID, user.ID).
 		Order("others.last_active DESC").
 		Limit(10).
 		First(&collaborators).Error

@@ -4,9 +4,8 @@ import LocalStorage, {AUTH_TOKEN_KEY} from "../../services/storage.service.ts";
 
 export interface CreateSessionDTO {
     language: string
-    memoryLimit: number
-    timeout: number
     title: string
+    collaboratorIds: string
 }
 
 export async function createSession(data: CreateSessionDTO, { rejectWithValue }) {

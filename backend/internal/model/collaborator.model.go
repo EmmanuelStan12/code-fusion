@@ -21,6 +21,7 @@ type CollaboratorModel struct {
 	Role           string           `json:"role"`
 	LastActive     time.Time        `json:"lastActive"`
 	ActiveDuration uint             `json:"activeDuration"`
+	IsActive       bool             `gorm:"-" json:"isActive"`
 }
 
 type CollaboratorDTO struct {

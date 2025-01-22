@@ -21,14 +21,13 @@ function App() {
     const dispatch = useAppDispatch()
     const status = state.status || AuthActionStatus.AUTHENTICATION_IN_PROGRESS
 
-    console.log(state)
     useEffect(() => {
         if (LocalStorage.get(AUTH_TOKEN_KEY) && !state?.data?.user) {
             dispatch<any>(authSlice.getAuthUser())
         }
     }, []);
 
-    if (status === AuthActionStatus.AUTHENTICATION_IN_PROGRESS) {
+    if (status === AuthActionStatus.AUTHENTICATION_IN_PROGRESS && LocalStorage.get(AUTH_TOKEN_KEY)) {
         return <LoadingPage />
     }
 

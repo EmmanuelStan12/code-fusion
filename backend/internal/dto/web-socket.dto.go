@@ -22,6 +22,7 @@ const (
 	ActionAddCollaboratorError    ActionType = "ADD_COLLABORATOR_ERROR"
 	ActionAddCollaboratorSuccess  ActionType = "ADD_COLLABORATOR_SUCCESS"
 	ActionMessageTypeNotSupported ActionType = "MESSAGE_TYPE_NOT_SUPPORTED"
+	ActionCannotDecodeActionType  ActionType = "CANNOT_DECODE_ACTION_TYPE"
 	ActionCodeExecutionFailed     ActionType = "CODE_EXECUTION_FAILED"
 	ActionError                   ActionType = "ERROR"
 )
