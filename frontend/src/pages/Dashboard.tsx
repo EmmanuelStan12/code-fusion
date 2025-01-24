@@ -39,7 +39,8 @@ const Dashboard = () => {
                 position: 'top-right',
                 className: "text-base"
             })
-            const { currentSession, collaborator } = codeSessionState?.data
+            const { currentSession } = codeSessionState?.data
+            dispatch(sessionSlice.clearState())
             navigate(`/sessions/${currentSession?.sessionId}?new=true`)
         }
     }, [codeSessionState.status]);

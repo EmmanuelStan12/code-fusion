@@ -10,5 +10,6 @@
     "INVALID_PASSWORD": "The password provided is invalid. Please ensure it up to 8 characters long.",
     "INVALID_EMAIL_OR_PASSWORD": "The email or password entered is incorrect. Please try again.",
     "EMAIL_ALREADY_EXISTS": "The email address is already registered. Please use a different email or log in.",
-    "USERNAME_ALREADY_EXISTS": "The username already exists. Please use a different username."
+    "USERNAME_ALREADY_EXISTS": "The username already exists. Please use a different username.",
+    "INTERNAL_SERVER_ERROR": "Something went wrong, Please try again later."
 }

@@ -26,7 +26,12 @@ export const fetchCodeSession = createAsyncThunk(
 const CodeSessionSlice = createSlice({
     name: CODE_SESSION_SLICE_NAME,
     initialState,
-    reducers: {} as any,
+    reducers: {
+        clearState: (state: CodeSessionState) => {
+            state.status = undefined
+            state.message = undefined
+        }
+    } as any,
     extraReducers: (builder) => {
         builder.addCase(createCodeSession.pending, (state: CodeSessionState, action) => {
             state.status = CodeSessionActionStatus.CREATE_SESSION_IN_PROGRESS
@@ -74,4 +79,5 @@ const CodeSessionSlice = createSlice({
     }
 })
 
+export const { clearState } = CodeSessionSlice.actions
 export default CodeSessionSlice.reducer
